@@ -28,6 +28,7 @@ interface SwipeCardProps {
   isTop:              boolean;
   stackIndex:         number;
   onSwipe:            (direction: "like" | "pass", film: FilmData) => void;
+  onShortlist?:       (film: FilmData) => void;
   triggerRef?:        MutableRefObject<((dir: "like" | "pass") => void) | null>;
   triggerDetailsRef?: MutableRefObject<(() => void) | null>;
 }
@@ -51,7 +52,7 @@ function deriveAccent(title: string) {
   return palettes[Math.abs(hash) % palettes.length];
 }
 
-export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef, triggerDetailsRef }: SwipeCardProps) {
+export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlist, triggerRef, triggerDetailsRef }: SwipeCardProps) {
   const [dragState, setDragState] = useState({ x: 0, y: 0 });
   const dragRef   = useRef({ x: 0, y: 0 });
   const startRef  = useRef({ x: 0, y: 0 });
@@ -305,6 +306,40 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
           opacity: passOp, transform: "rotate(14deg)",
           transition: dragging ? "none" : "opacity 0.1s",
         }}>PASS</div>
+
+        {/* Shortlist button — solid gold pill, bottom-right of poster */}
+        {isTop && onShortlist && (
+          <button
+            onMouseDown={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+            onClick={() => {
+              onShortlist(film);
+              if (!exiting) {
+                setExiting("right");
+                setTimeout(() => onSwipe("like", film), 430);
+              }
+            }}
+            style={{
+              position: "absolute",
+              bottom: 128,
+              right: 14,
+              zIndex: 8,
+              background: "#C9A961",
+              border: "none",
+              borderRadius: 2,
+              padding: "6px 13px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "#0A0A0A",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            + Shortlist
+          </button>
+        )}
 
         {/* Info panel — always visible at bottom */}
         <div style={{

@@ -101,6 +101,7 @@ export default function SwipeDeck({ films, onSwipe, onShortlist, onUndo, onEmpty
             isTop={i === 0}
             stackIndex={i}
             onSwipe={handleSwipe}
+            onShortlist={i === 0 && onShortlist ? (f) => onShortlist(f.tmdbId, f) : undefined}
             triggerRef={i === 0 ? triggerRef : undefined}
             triggerDetailsRef={i === 0 ? triggerDetailsRef : undefined}
           />
@@ -131,12 +132,12 @@ export default function SwipeDeck({ films, onSwipe, onShortlist, onUndo, onEmpty
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path
               d="M4 8 C4 4.5 7 2 11 2 C15 2 18 5 18 9 C18 13 15 16 11 16 C8.5 16 6.4 14.8 5.2 13"
-              stroke="#7a6a5a"
+              stroke="#C9A961"
               strokeWidth="1.5"
               strokeLinecap="round"
               fill="none"
             />
-            <polyline points="2,6 4,9 7,7" stroke="#7a6a5a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <polyline points="2,6 4,9 7,7" stroke="#C9A961" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </svg>
           <span style={{
             fontFamily: "var(--font-mono)",
@@ -150,43 +151,6 @@ export default function SwipeDeck({ films, onSwipe, onShortlist, onUndo, onEmpty
         </button>
       </div>
 
-      {/* Shortlist button — above the main actions */}
-      {onShortlist && queue.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 6, flexShrink: 0 }}>
-          <button
-            onClick={() => {
-              const top = queue[0];
-              if (!top) return;
-              onShortlist(top.tmdbId, top);
-              handleSwipe("like", top);
-            }}
-            style={{
-              background: "none",
-              border: "1px solid #2a2218",
-              color: "#7a6540",
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              padding: "7px 18px",
-              borderRadius: 2,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#C9A96155";
-              (e.currentTarget as HTMLButtonElement).style.color = "#C9A961";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "#2a2218";
-              (e.currentTarget as HTMLButtonElement).style.color = "#7a6540";
-            }}
-          >
-            + Shortlist
-          </button>
-        </div>
-      )}
-
       {/* Buttons — ✕ and ♥ */}
       <div style={{
         display: "flex",
@@ -199,8 +163,8 @@ export default function SwipeDeck({ films, onSwipe, onShortlist, onUndo, onEmpty
         <Btn onClick={() => triggerRef.current?.("pass")}
           size={56} color="#5A5550" bg="#111" border="#202020">✕</Btn>
         <Btn onClick={() => triggerRef.current?.("like")}
-          size={66} color="#C9A961" bg="#14100a" border="#C9A96140"
-          shadow="0 0 24px #C9A96118">♥</Btn>
+          size={66} color="#8B2A2A" bg="#120808" border="#8B2A2A40"
+          shadow="0 0 24px #8B2A2A18">♥</Btn>
       </div>
     </div>
   );

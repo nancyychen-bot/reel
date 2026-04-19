@@ -6,15 +6,17 @@
  *
  * Requires: TMDB_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY in .env.local
  */
+import * as fs from "fs";
 import * as cheerio from "cheerio";
+import { createClient } from "@supabase/supabase-js";
 import { SEED_LISTS } from "./seed-lists";
 
 // Load env
-const envFile = await import("fs").then(fs => fs.readFileSync(".env.local", "utf8"));
+const envFile = fs.readFileSync(".env.local", "utf8");
 const env: Record<string, string> = {};
 envFile.split("\n").forEach(line => {
-  const [k, v] = line.split("=");
-  if (k && v) env[k.trim()] = v.trim();
+  const eq = line.indexOf("=");
+  if (eq > 0) env[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
 });
 
 const TMDB_KEY = env["TMDB_API_KEY"];
@@ -27,7 +29,6 @@ if (!TMDB_KEY || !SUPA_URL || !SUPA_KEY) {
 }
 
 // ── Supabase admin client ──────────────────────────────────────────────────
-const { createClient } = await import("@supabase/supabase-js");
 const supabase = createClient(SUPA_URL, SUPA_KEY);
 
 // ── TMDB helpers ──────────────────────────────────────────────────────────

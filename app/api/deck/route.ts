@@ -1,12 +1,45 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildDeck, type FilmRecord, type UserPrefs } from "@/lib/recommender";
-import { getMovieDetail } from "@/lib/tmdb";
 import type { Mood } from "@/lib/moods";
+
+const TMDB_KEY = process.env.TMDB_API_KEY;
+
+// Fetch N pages of TMDB top-rated films directly (no DB required)
+async function fetchTmdbPool(pages = 10): Promise<FilmRecord[]> {
+  if (!TMDB_KEY) return [];
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      fetch(
+        `https://api.themoviedb.org/3/movie/top_rated?api_key=${TMDB_KEY}&language=en-US&page=${i + 1}`
+      )
+        .then(r => r.json())
+        .catch(() => ({ results: [] }))
+    )
+  );
+  return results.flatMap((p: any) =>
+    (p.results ?? [])
+      .filter((f: any) => f.poster_path && f.title)
+      .map((f: any): FilmRecord => ({
+        tmdb_id:     f.id,
+        imdb_id:     "",
+        title:       f.title,
+        year:        parseInt(f.release_date?.slice(0, 4) ?? "0"),
+        runtime:     0,
+        genres:      [], // genre_ids only here; full genres need a detail call
+        director:    "",
+        plot:        f.overview ?? "",
+        poster_url:  `https://image.tmdb.org/t/p/w500${f.poster_path}`,
+        tmdb_rating: f.vote_average ?? 0,
+        list_count:  0,
+      }))
+  );
+}
 
 export async function GET(request: NextRequest) {
   const moodsParam = request.nextUrl.searchParams.get("moods") ?? "";
   const moods = moodsParam ? (moodsParam.split(",") as Mood[]) : [];
+  const page  = parseInt(request.nextUrl.searchParams.get("page") ?? "1");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -19,78 +52,70 @@ export async function GET(request: NextRequest) {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  // Get swipe history
+  // Get swipe history (tmdb_id stored as imdb_id field — use tmdb_id column when available)
   const { data: swipes } = await supabase
     .from("swipes")
     .select("imdb_id")
     .eq("user_id", user.id);
-  const { data: watched } = await supabase
-    .from("watched")
-    .select("imdb_id")
-    .eq("user_id", user.id);
 
   const swipedIds = new Set<number>();
-  const watchedIds = new Set<number>();
-  (swipes ?? []).forEach((s: any) => swipedIds.add(parseInt(s.imdb_id)));
-  (watched ?? []).forEach((w: any) => watchedIds.add(parseInt(w.imdb_id)));
+  (swipes ?? []).forEach((s: any) => {
+    const n = parseInt(s.imdb_id);
+    if (!isNaN(n)) swipedIds.add(n);
+  });
 
-  // Pull curated pool
-  const { data: pool } = await supabase
+  // Try DB pool first
+  const { data: dbPool } = await supabase
     .from("movies")
     .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
     .order("tmdb_rating", { ascending: false })
     .limit(500);
 
-  // Count list appearances per film
-  const { data: listCounts } = await supabase.rpc("film_list_counts") as { data: Array<{ tmdb_id: number; count: number }> | null };
-  const countMap = new Map<number, number>();
-  (listCounts ?? []).forEach(r => countMap.set(r.tmdb_id, r.count));
-
-  const filmPool: FilmRecord[] = (pool ?? []).map((f: any) => ({
+  let filmPool: FilmRecord[] = (dbPool ?? []).map((f: any) => ({
     tmdb_id:     f.tmdb_id,
-    imdb_id:     f.imdb_id,
+    imdb_id:     f.imdb_id ?? "",
     title:       f.title,
-    year:        f.year,
-    runtime:     f.runtime_minutes,
+    year:        f.year ?? 0,
+    runtime:     f.runtime_minutes ?? 0,
     genres:      f.genres ?? [],
     director:    f.director ?? "",
     plot:        f.plot ?? "",
     poster_url:  f.poster_url ?? "",
     tmdb_rating: f.tmdb_rating ?? 0,
-    list_count:  countMap.get(f.tmdb_id) ?? 0,
+    list_count:  0,
   }));
 
-  // Build user prefs object
-  let seedGenres: string[] = [];
-  let seedDirectors: string[] = [];
-
-  if (prefs?.favorite_film_tmdb_ids?.length) {
-    // Pull seed film details from DB (they should already be cached)
-    const { data: seedFilms } = await supabase
-      .from("movies")
-      .select("genres, director")
-      .in("tmdb_id", prefs.favorite_film_tmdb_ids);
-
-    (seedFilms ?? []).forEach((sf: any) => {
-      seedGenres.push(...(sf.genres ?? []));
-      if (sf.director) seedDirectors.push(sf.director);
-    });
+  // Fall back to TMDB directly if DB is empty or sparse
+  if (filmPool.length < 50) {
+    filmPool = await fetchTmdbPool(13); // ~260 films
   }
 
+  // Build user prefs
   const userPrefs: UserPrefs = {
     favoriteGenres: prefs?.preferred_genres ?? [],
-    seedGenres:     [...new Set(seedGenres)],
-    seedDirectors:  [...new Set(seedDirectors)],
+    seedGenres:     [],
+    seedDirectors:  [],
   };
 
-  const deck = buildDeck({ pool: filmPool, swipedIds, watchedIds, userPrefs, moods });
+  // Rotate pool across pages so "endless" works — each page gets a different slice
+  // by using a seeded shuffle offset based on page number
+  const offset = ((page - 1) * 30) % Math.max(filmPool.length, 1);
+  const rotatedPool = [...filmPool.slice(offset), ...filmPool.slice(0, offset)];
 
-  // Shape into FilmData for SwipeCard
+  const deck = buildDeck({
+    pool:      rotatedPool,
+    swipedIds,
+    watchedIds: new Set(),
+    userPrefs,
+    moods,
+    count: 30,
+  });
+
   const films = deck.map(f => ({
     tmdbId:     f.tmdb_id,
     title:      f.title,
     year:       f.year,
-    director:   f.director,
+    director:   f.director || "Unknown",
     runtime:    f.runtime,
     genres:     f.genres,
     plot:       f.plot,

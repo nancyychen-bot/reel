@@ -12,6 +12,7 @@ export default function SwipePage() {
   const [moodsReady, setMoodsReady] = useState(false);
   const [films, setFilms] = useState<FilmData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
   const [match, setMatch] = useState<MatchFilm | null>(null);
 
   // Load session-stored moods on mount
@@ -23,16 +24,21 @@ export default function SwipePage() {
     setMoodsReady(true);
   }, []);
 
-  // Load deck whenever moods change
+  // Load deck whenever moods or page change
   useEffect(() => {
     if (!moodsReady) return;
     setLoading(true);
     const arr = Array.from(moods);
-    fetch(`/api/deck${arr.length ? `?moods=${arr.join(",")}` : ""}`)
+    const params = new URLSearchParams({ page: String(page) });
+    if (arr.length) params.set("moods", arr.join(","));
+    fetch(`/api/deck?${params}`)
       .then(r => r.json())
-      .then(data => { setFilms(data.films ?? []); setLoading(false); })
+      .then(data => {
+        setFilms(prev => page === 1 ? (data.films ?? []) : [...prev, ...(data.films ?? [])]);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
-  }, [moods, moodsReady]);
+  }, [moods, moodsReady, page]);
 
   const handleSwipe = useCallback(async (tmdbId: number, direction: "like" | "pass") => {
     const res = await fetch("/api/swipe", {
@@ -45,6 +51,8 @@ export default function SwipePage() {
   }, []);
 
   function toggleMood(mood: Mood) {
+    setPage(1);
+    setFilms([]);
     setMoods(prev => {
       const next = new Set(prev);
       next.has(mood) ? next.delete(mood) : next.add(mood);
@@ -123,7 +131,7 @@ export default function SwipePage() {
           <SwipeDeck
             films={films}
             onSwipe={handleSwipe}
-            onEmpty={() => {/* optionally load more */}}
+            onEmpty={() => setPage(p => p + 1)}
           />
         )}
       </div>

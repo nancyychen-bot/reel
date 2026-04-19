@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildRoomDeck, type FilmRecord, type UserPrefs } from "@/lib/recommender";
-import type { Mood } from "@/lib/moods";
+import { type Genre, type Special } from "@/lib/filters";
 
 export async function GET(
   _: NextRequest,
@@ -20,29 +20,29 @@ export async function GET(
 
   if (!room) return Response.json({ error: "Room not found" }, { status: 404 });
 
-  // If queue already computed, return it
+  // Return cached queue if already generated
   if (room.queue_imdb_ids?.length) {
     const { data: films } = await supabase
       .from("movies")
       .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
       .in("imdb_id", room.queue_imdb_ids);
 
-    const shaped = (films ?? []).map((f: any) => ({
-      tmdbId:     f.tmdb_id,
-      title:      f.title,
-      year:       f.year,
-      director:   f.director,
-      runtime:    f.runtime_minutes,
-      genres:     f.genres ?? [],
-      plot:       f.plot ?? "",
-      tmdbRating: f.tmdb_rating ?? 0,
-      posterUrl:  f.poster_url ?? "",
-    }));
+    // Preserve stored order
+    const filmMap = new Map((films ?? []).map((f: any) => [f.imdb_id, f]));
+    const ordered = room.queue_imdb_ids
+      .map((id: string) => filmMap.get(id))
+      .filter(Boolean);
 
-    return Response.json({ films: shaped });
+    return Response.json({ films: ordered.map(shapeFilm) });
   }
 
-  // Get both participants
+  // Parse genres/special from mood_tags (stored as ["Drama","Thriller","Short"] etc.)
+  const tags: string[] = room.mood_tags ?? [];
+  const SPECIAL_VALUES = ["Short", "Epic", "Classic", "Recent"];
+  const genres  = tags.filter(t => !SPECIAL_VALUES.includes(t)) as Genre[];
+  const special = tags.filter(t =>  SPECIAL_VALUES.includes(t)) as Special[];
+
+  // Get participants and build prefs for both
   const { data: participants } = await supabase
     .from("room_participants")
     .select("user_id")
@@ -50,32 +50,16 @@ export async function GET(
 
   const participantIds = (participants ?? []).map((p: any) => p.user_id);
 
-  // Build prefs for each participant
   async function getPrefs(uid: string): Promise<UserPrefs> {
     const { data: prefs } = await supabase
       .from("user_preferences")
       .select("preferred_genres, favorite_film_tmdb_ids")
       .eq("user_id", uid)
       .maybeSingle();
-
-    let seedGenres: string[] = [];
-    let seedDirectors: string[] = [];
-
-    if (prefs?.favorite_film_tmdb_ids?.length) {
-      const { data: seedFilms } = await supabase
-        .from("movies")
-        .select("genres, director")
-        .in("tmdb_id", prefs.favorite_film_tmdb_ids);
-      (seedFilms ?? []).forEach((sf: any) => {
-        seedGenres.push(...(sf.genres ?? []));
-        if (sf.director) seedDirectors.push(sf.director);
-      });
-    }
-
     return {
       favoriteGenres: prefs?.preferred_genres ?? [],
-      seedGenres:     [...new Set(seedGenres)],
-      seedDirectors:  [...new Set(seedDirectors)],
+      seedGenres:     [],
+      seedDirectors:  [],
     };
   }
 
@@ -83,53 +67,60 @@ export async function GET(
     participantIds.slice(0, 2).map(getPrefs)
   );
 
+  // Quality pool: seeded films only, rated 7.3+, ordered by rating desc
+  // This leans toward acclaimed/arthouse rather than mainstream blockbusters
   const { data: pool } = await supabase
     .from("movies")
     .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
+    .gte("tmdb_rating", 7.3)
     .order("tmdb_rating", { ascending: false })
-    .limit(500);
+    .limit(600);
 
   const filmPool: FilmRecord[] = (pool ?? []).map((f: any) => ({
     tmdb_id:     f.tmdb_id,
     imdb_id:     f.imdb_id,
     title:       f.title,
     year:        f.year,
-    runtime:     f.runtime_minutes,
+    runtime:     f.runtime_minutes ?? 0,
     genres:      f.genres ?? [],
     director:    f.director ?? "",
     plot:        f.plot ?? "",
     poster_url:  f.poster_url ?? "",
     tmdb_rating: f.tmdb_rating ?? 0,
-    list_count:  1,
+    list_count:  1, // all DB films are curated — score them as such
   }));
 
-  const moods = (room.mood_tags ?? []) as Mood[];
   const deck = buildRoomDeck({
     pool:       filmPool,
     swipedIds:  new Set(),
     watchedIds: new Set(),
     userAPrefs: userAPrefs ?? { favoriteGenres: [], seedGenres: [], seedDirectors: [] },
     userBPrefs: userBPrefs ?? { favoriteGenres: [], seedGenres: [], seedDirectors: [] },
-    moods,
+    moods:      [],
+    genres,
+    special,
+    count:      60,
   });
 
-  // Cache queue on the room
+  // Cache on room row so both users get identical films
   await supabase.from("rooms").update({
     queue_imdb_ids: deck.map(f => f.imdb_id),
     status: "active",
   }).eq("id", room.id);
 
-  const films = deck.map(f => ({
+  return Response.json({ films: deck.map(shapeFilm) });
+}
+
+function shapeFilm(f: any) {
+  return {
     tmdbId:     f.tmdb_id,
     title:      f.title,
     year:       f.year,
-    director:   f.director,
-    runtime:    f.runtime,
-    genres:     f.genres,
-    plot:       f.plot,
-    tmdbRating: f.tmdb_rating,
-    posterUrl:  f.poster_url,
-  }));
-
-  return Response.json({ films });
+    director:   f.director || "Unknown",
+    runtime:    f.runtime_minutes ?? f.runtime ?? 0,
+    genres:     f.genres ?? [],
+    plot:       f.plot ?? "",
+    tmdbRating: f.tmdb_rating ?? 0,
+    posterUrl:  f.poster_url ?? "",
+  };
 }

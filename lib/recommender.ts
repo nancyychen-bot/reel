@@ -94,6 +94,8 @@ export function buildRoomDeck({
   userAPrefs,
   userBPrefs,
   moods,
+  genres,
+  special,
   count = 50,
 }: {
   pool:       FilmRecord[]
@@ -102,15 +104,23 @@ export function buildRoomDeck({
   userAPrefs: UserPrefs
   userBPrefs: UserPrefs
   moods:      Mood[]
+  genres?:    Genre[]
+  special?:   Special[]
   count?:     number
 }): FilmRecord[] {
   let candidates = pool.filter(
     f => !swipedIds.has(f.tmdb_id) && !watchedIds.has(f.tmdb_id)
   )
 
-  candidates = candidates.filter(f =>
-    matchesMoods({ genres: f.genres, runtime: f.runtime, year: f.year, director: f.director }, moods)
-  )
+  if (genres !== undefined || special !== undefined) {
+    candidates = candidates.filter(f =>
+      matchesFilters({ genres: f.genres, runtime: f.runtime, year: f.year }, genres ?? [], special ?? [])
+    )
+  } else {
+    candidates = candidates.filter(f =>
+      matchesMoods({ genres: f.genres, runtime: f.runtime, year: f.year, director: f.director }, moods)
+    )
+  }
 
   const score = (f: FilmRecord, prefs: UserPrefs) => {
     let s = 0

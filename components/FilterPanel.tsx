@@ -52,7 +52,7 @@ export default function FilterPanel({
           borderTop: "1px solid #1e1e1e",
           borderRadius: "10px 10px 0 0",
           padding: "16px 20px 32px",
-          transform: open ? "translateY(0)" : "translateY(110%)",
+          transform: open ? "translateY(0)" : "translateY(200%)",
           transition: "transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94)",
         }}
       >

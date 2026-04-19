@@ -323,8 +323,8 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             {film.title}
           </div>
           <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 12,
-            color: "#5A5550", letterSpacing: "0.07em",
+            fontFamily: "var(--font-mono)", fontSize: 13,
+            color: "#5A5550", letterSpacing: "0.05em",
           }}>
             {(enriched?.director ?? film.director) !== "Unknown" ? (enriched?.director ?? film.director) : ""}
           </div>
@@ -333,8 +333,8 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             marginTop: 3,
           }}>
             <div style={{
-              fontFamily: "var(--font-mono)", fontSize: 11,
-              color: "#3a3a3a", letterSpacing: "0.07em",
+              fontFamily: "var(--font-mono)", fontSize: 12,
+              color: "#3a3a3a", letterSpacing: "0.06em",
             }}>
               {(enriched?.country ?? film.country) ? `${enriched?.country ?? film.country} · ` : ""}{film.year}
             </div>

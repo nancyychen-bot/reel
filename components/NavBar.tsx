@@ -46,13 +46,13 @@ export default function NavBar() {
       left: "50%",
       transform: "translateX(-50%)",
       width: "min(100vw, 390px)",
-      height: 70,
       background: "#0A0A0A",
       borderTop: "1px solid #161616",
       display: "flex",
-      alignItems: "center",
+      alignItems: "flex-start",
       justifyContent: "space-around",
-      paddingBottom: 6,
+      paddingTop: 14,
+      paddingBottom: "max(16px, env(safe-area-inset-bottom))" as string,
       zIndex: 100,
     }}>
       {TABS.map(tab => {
@@ -84,9 +84,9 @@ export default function NavBar() {
             )}
             <span style={{
               fontFamily: "var(--font-mono)",
-              fontSize: 8,
+              fontSize: 9,
               color: active ? "#6a6560" : "#2a2a2a",
-              letterSpacing: "0.14em",
+              letterSpacing: "0.12em",
               textTransform: "uppercase",
             }}>
               {tab.label}

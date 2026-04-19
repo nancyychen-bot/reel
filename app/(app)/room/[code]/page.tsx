@@ -277,7 +277,7 @@ export default function LiveRoomPage() {
       background: "#0A0A0A",
       display: "flex", flexDirection: "column",
       overflow: "hidden",
-      paddingBottom: 70,
+      paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string,
     }}>
       <MatchModal film={match} onDone={() => setMatch(null)} />
 

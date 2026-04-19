@@ -45,7 +45,7 @@ export default function RoomsPage() {
         position: "absolute", inset: 0,
         background: "#0A0A0A",
         display: "flex", flexDirection: "column",
-        paddingBottom: 70,
+        paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string,
       }}>
         <header style={{ padding: "24px 24px 20px", borderBottom: "1px solid rgba(245,241,234,0.06)" }}>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#5A5550", letterSpacing: "0.12em", marginBottom: 4 }}>
@@ -116,7 +116,7 @@ export default function RoomsPage() {
       position: "absolute", inset: 0,
       background: "#0A0A0A",
       overflowY: "auto",
-      paddingBottom: 70,
+      paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string,
     }}>
       <header style={{ padding: "24px 24px 20px", borderBottom: "1px solid rgba(245,241,234,0.06)" }}>
         <h1 style={{

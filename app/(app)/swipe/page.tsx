@@ -141,7 +141,7 @@ export default function SwipePage() {
       display: "flex",
       flexDirection: "column",
       overflow: "hidden",
-      paddingBottom: 70, // nav bar height
+      paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string, // nav bar height
     }}>
       {/* Match toast */}
       <MatchModal film={match} onDone={() => setMatch(null)} />
@@ -242,8 +242,8 @@ export default function SwipePage() {
         >
           <span style={{
             fontFamily: "var(--font-mono)",
-            fontSize: 9,
-            letterSpacing: "0.16em",
+            fontSize: 11,
+            letterSpacing: "0.14em",
             textTransform: "uppercase",
             color: totalFilters > 0 ? "#C9A961" : "#3a3a3a",
           }}>
@@ -254,7 +254,7 @@ export default function SwipePage() {
               background: "#C9A961",
               color: "#0A0A0A",
               fontFamily: "var(--font-mono)",
-              fontSize: 8,
+              fontSize: 9,
               borderRadius: 10,
               padding: "1px 6px",
               letterSpacing: "0.04em",
@@ -284,9 +284,9 @@ export default function SwipePage() {
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "var(--font-mono)",
-          fontSize: 10,
+          fontSize: 13,
           color: "#3a3a3a",
-          letterSpacing: "0.16em",
+          letterSpacing: "0.14em",
           textTransform: "uppercase",
         }}>
           Curating…

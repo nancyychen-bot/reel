@@ -180,7 +180,7 @@ export default function ListsPage() {
       background: "#0A0A0A",
       display: "flex",
       flexDirection: "column",
-      paddingBottom: 70,
+      paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string,
     }}>
       {/* Header */}
       <div style={{ padding: "24px 24px 0", borderBottom: "1px solid rgba(245,241,234,0.06)", flexShrink: 0 }}>
@@ -214,7 +214,7 @@ export default function ListsPage() {
                 borderBottom: `2px solid ${active === tab.key ? "#C9A961" : "transparent"}`,
                 color: active === tab.key ? "#F5F1EA" : "#5A5550",
                 fontFamily: "var(--font-mono)",
-                fontSize: 9,
+                fontSize: 11,
                 letterSpacing: "0.12em",
                 textTransform: "uppercase",
                 padding: "10px 16px 10px 0",
@@ -232,7 +232,7 @@ export default function ListsPage() {
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
         {loading && (
-          <div style={{ padding: "32px 24px", fontFamily: "var(--font-mono)", fontSize: 10, color: "#3A3A3A", letterSpacing: "0.12em" }}>
+          <div style={{ padding: "32px 24px", fontFamily: "var(--font-mono)", fontSize: 12, color: "#3A3A3A", letterSpacing: "0.12em" }}>
             Loading…
           </div>
         )}
@@ -243,7 +243,7 @@ export default function ListsPage() {
               {active === "shortlist" ? "No films shortlisted yet." : "Nothing here yet."}
             </div>
             {active === "shortlist" && (
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#2a2a2a", letterSpacing: "0.1em", marginTop: 12 }}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "#2a2a2a", letterSpacing: "0.1em", marginTop: 12 }}>
                 Tap + on any film to add it here
               </div>
             )}
@@ -291,9 +291,9 @@ export default function ListsPage() {
                   {item.title}
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 3 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#5A5550" }}>{item.year || ""}</span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "#5A5550" }}>{item.year || ""}</span>
                   {item.extra && (
-                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 10, color: "#8B2A2A" }}>{item.extra}</span>
+                    <span style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "#8B2A2A" }}>{item.extra}</span>
                   )}
                 </div>
               </div>

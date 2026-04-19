@@ -46,7 +46,7 @@ export default function FilterPanel({
           position: "fixed",
           left: 0,
           right: 0,
-          bottom: 70, // above nav bar
+          bottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string,
           zIndex: 101,
           background: "#0e0e0e",
           borderTop: "1px solid #1e1e1e",

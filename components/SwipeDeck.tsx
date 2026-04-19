@@ -104,21 +104,62 @@ export default function SwipeDeck({ films, onSwipe, onUndo, onEmpty }: SwipeDeck
             triggerDetailsRef={i === 0 ? triggerDetailsRef : undefined}
           />
         ))}
+
+        {/* Undo — top-right of card stack, Hinge-style */}
+        <button
+          onClick={handleUndo}
+          disabled={!lastSwiped}
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 22,
+            zIndex: 20,
+            background: "none",
+            border: "none",
+            padding: "6px 4px",
+            cursor: lastSwiped ? "pointer" : "default",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 3,
+            opacity: lastSwiped ? 1 : 0.22,
+            transition: "opacity 0.2s ease",
+          }}
+        >
+          {/* SVG arc-back arrow, styled to match the app */}
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M4 8 C4 4.5 7 2 11 2 C15 2 18 5 18 9 C18 13 15 16 11 16 C8.5 16 6.4 14.8 5.2 13"
+              stroke="#7a6a5a"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <polyline points="2,6 4,9 7,7" stroke="#7a6a5a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </svg>
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 8,
+            letterSpacing: "0.14em",
+            color: "#5a5050",
+            textTransform: "uppercase",
+          }}>
+            Undo
+          </span>
+        </button>
       </div>
 
-      {/* Buttons */}
+      {/* Buttons — ✕ and ♥ */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 20,
+        gap: 24,
         padding: "10px 0 18px",
         flexShrink: 0,
       }}>
         <Btn onClick={() => triggerRef.current?.("pass")}
           size={56} color="#5A5550" bg="#111" border="#202020">✕</Btn>
-        <Btn onClick={handleUndo} disabled={!lastSwiped}
-          size={44} color={lastSwiped ? "#7a6a5a" : "#2a2a2a"} bg="#0e0e0e" border={lastSwiped ? "#3a3030" : "#1a1a1a"}>↩</Btn>
         <Btn onClick={() => triggerRef.current?.("like")}
           size={66} color="#C9A961" bg="#14100a" border="#C9A96140"
           shadow="0 0 24px #C9A96118">♥</Btn>
@@ -127,7 +168,7 @@ export default function SwipeDeck({ films, onSwipe, onUndo, onEmpty }: SwipeDeck
   );
 }
 
-function Btn({ children, onClick, size, color, bg, border, shadow, disabled }: {
+function Btn({ children, onClick, size, color, bg, border, shadow }: {
   children: React.ReactNode;
   onClick?: () => void;
   size: number;
@@ -135,29 +176,26 @@ function Btn({ children, onClick, size, color, bg, border, shadow, disabled }: {
   bg: string;
   border: string;
   shadow?: string;
-  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
       style={{
         width: size, height: size,
         borderRadius: "50%",
         background: bg,
         border: `1px solid ${border}`,
         color,
-        fontSize: size > 60 ? 26 : size > 50 ? 22 : 18,
-        cursor: disabled ? "default" : "pointer",
+        fontSize: size > 60 ? 26 : 22,
+        cursor: "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         boxShadow: shadow ?? "none",
         flexShrink: 0,
         transition: "transform 0.1s ease",
-        opacity: disabled ? 0.4 : 1,
       }}
-      onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.06)"; }}
+      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.06)"; }}
       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
     >
       {children}

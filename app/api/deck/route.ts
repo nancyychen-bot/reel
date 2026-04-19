@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildDeck, type FilmRecord, type UserPrefs } from "@/lib/recommender";
-import type { Mood } from "@/lib/moods";
+import { type Genre, type Special } from "@/lib/filters";
 
 const TMDB_KEY = process.env.TMDB_API_KEY;
 
@@ -94,9 +94,11 @@ async function fetchDiscoverPool(pages = 15, offset = 0): Promise<FilmRecord[]> 
 }
 
 export async function GET(request: NextRequest) {
-  const moodsParam = request.nextUrl.searchParams.get("moods") ?? "";
-  const moods = moodsParam ? (moodsParam.split(",") as Mood[]) : [];
-  const page  = parseInt(request.nextUrl.searchParams.get("page") ?? "1");
+  const genresParam  = request.nextUrl.searchParams.get("genres") ?? "";
+  const specialParam = request.nextUrl.searchParams.get("special") ?? "";
+  const genres  = genresParam  ? (genresParam.split(",")  as Genre[])   : [];
+  const special = specialParam ? (specialParam.split(",") as Special[]) : [];
+  const page    = parseInt(request.nextUrl.searchParams.get("page") ?? "1");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -175,7 +177,9 @@ export async function GET(request: NextRequest) {
     swipedIds,
     watchedIds: new Set(),
     userPrefs,
-    moods,
+    moods:      [],
+    genres,
+    special,
     count: 30,
   });
 

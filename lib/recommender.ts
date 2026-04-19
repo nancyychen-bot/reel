@@ -1,4 +1,5 @@
 import { matchesMoods, type Mood } from './moods'
+import { matchesFilters, type Genre, type Special } from './filters'
 
 export interface FilmRecord {
   tmdb_id:   number
@@ -26,6 +27,8 @@ export interface RecommenderInput {
   watchedIds:   Set<number>     // marked watched
   userPrefs:    UserPrefs
   moods:        Mood[]
+  genres?:      Genre[]
+  special?:     Special[]
   count?:       number
 }
 
@@ -35,6 +38,8 @@ export function buildDeck({
   watchedIds,
   userPrefs,
   moods,
+  genres,
+  special,
   count = 30,
 }: RecommenderInput): FilmRecord[] {
   // 1. Filter out seen films
@@ -42,10 +47,16 @@ export function buildDeck({
     f => !swipedIds.has(f.tmdb_id) && !watchedIds.has(f.tmdb_id)
   )
 
-  // 2. Filter by mood
-  candidates = candidates.filter(f =>
-    matchesMoods({ genres: f.genres, runtime: f.runtime, year: f.year, director: f.director }, moods)
-  )
+  // 2. Filter by genre/special (new) or mood (legacy rooms path)
+  if (genres !== undefined || special !== undefined) {
+    candidates = candidates.filter(f =>
+      matchesFilters({ genres: f.genres, runtime: f.runtime, year: f.year }, genres ?? [], special ?? [])
+    )
+  } else {
+    candidates = candidates.filter(f =>
+      matchesMoods({ genres: f.genres, runtime: f.runtime, year: f.year, director: f.director }, moods)
+    )
+  }
 
   // 3. Score
   const scored = candidates.map(f => {

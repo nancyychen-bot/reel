@@ -307,40 +307,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
           transition: dragging ? "none" : "opacity 0.1s",
         }}>PASS</div>
 
-        {/* Shortlist button — solid gold pill, bottom-right of poster */}
-        {isTop && onShortlist && (
-          <button
-            onMouseDown={e => e.stopPropagation()}
-            onTouchStart={e => e.stopPropagation()}
-            onClick={() => {
-              onShortlist(film);
-              if (!exiting) {
-                setExiting("right");
-                setTimeout(() => onSwipe("like", film), 430);
-              }
-            }}
-            style={{
-              position: "absolute",
-              bottom: 128,
-              right: 14,
-              zIndex: 8,
-              background: "#C9A961",
-              border: "none",
-              borderRadius: 2,
-              padding: "6px 13px",
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
-              color: "#0A0A0A",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-            }}
-          >
-            + Shortlist
-          </button>
-        )}
-
         {/* Info panel — always visible at bottom */}
         <div style={{
           position: "absolute", bottom: 0, left: 0, right: 0, height: 118,
@@ -363,10 +329,44 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             {(enriched?.director ?? film.director) !== "Unknown" ? (enriched?.director ?? film.director) : ""}
           </div>
           <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 11,
-            color: "#3a3a3a", letterSpacing: "0.07em", marginTop: 3,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            marginTop: 3,
           }}>
-            {(enriched?.country ?? film.country) ? `${enriched?.country ?? film.country} · ` : ""}{film.year}
+            <div style={{
+              fontFamily: "var(--font-mono)", fontSize: 11,
+              color: "#3a3a3a", letterSpacing: "0.07em",
+            }}>
+              {(enriched?.country ?? film.country) ? `${enriched?.country ?? film.country} · ` : ""}{film.year}
+            </div>
+            {isTop && onShortlist && (
+              <button
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+                onClick={() => {
+                  onShortlist(film);
+                  if (!exiting) {
+                    setExiting("right");
+                    setTimeout(() => onSwipe("like", film), 430);
+                  }
+                }}
+                style={{
+                  background: "#C9A961",
+                  border: "none",
+                  borderRadius: 2,
+                  padding: "5px 12px",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 9,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  color: "#0A0A0A",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                + Shortlist
+              </button>
+            )}
           </div>
         </div>
 

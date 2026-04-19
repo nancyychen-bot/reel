@@ -3,17 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import SwipeDeck from "@/components/SwipeDeck";
 import MatchModal, { type MatchFilm } from "@/components/MatchModal";
+import FilterPanel from "@/components/FilterPanel";
 import type { FilmData } from "@/components/SwipeCard";
-import { MOODS, type Mood } from "@/lib/moods";
+import { type Genre, type Special } from "@/lib/filters";
 
 export default function SwipePage() {
-  const [moods, setMoods]           = useState<Set<Mood>>(new Set());
-  const [moodsReady, setMoodsReady] = useState(false);
-  const [films, setFilms]           = useState<FilmData[]>([]);
-  const [loading, setLoading]       = useState(false);
-  const [page, setPage]             = useState(1);
-  const [match, setMatch]           = useState<MatchFilm | null>(null);
-  const [showHint, setShowHint]     = useState(false);
+  const [genres,  setGenres]  = useState<Set<Genre>>(new Set());
+  const [special, setSpecial] = useState<Set<Special>>(new Set());
+  const [filtersReady, setFiltersReady] = useState(false);
+  const [filterOpen, setFilterOpen]     = useState(false);
+  const [films, setFilms]   = useState<FilmData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage]       = useState(1);
+  const [match, setMatch]     = useState<MatchFilm | null>(null);
+  const [showHint, setShowHint] = useState(false);
 
   // Show first-time hint
   useEffect(() => {
@@ -23,22 +26,26 @@ export default function SwipePage() {
     }
   }, []);
 
-  // Load session-stored moods on mount
+  // Load session-stored filters on mount
   useEffect(() => {
-    const stored = sessionStorage.getItem("reel_moods");
-    if (stored) {
-      try { setMoods(new Set(JSON.parse(stored) as Mood[])); } catch { /* ignore */ }
-    }
-    setMoodsReady(true);
+    try {
+      const g = sessionStorage.getItem("reel_genres");
+      const s = sessionStorage.getItem("reel_special");
+      if (g) setGenres(new Set(JSON.parse(g) as Genre[]));
+      if (s) setSpecial(new Set(JSON.parse(s) as Special[]));
+    } catch { /* ignore */ }
+    setFiltersReady(true);
   }, []);
 
-  // Load deck whenever moods or page change
+  // Load deck whenever filters or page change
   useEffect(() => {
-    if (!moodsReady) return;
+    if (!filtersReady) return;
     setLoading(true);
-    const arr = Array.from(moods);
     const params = new URLSearchParams({ page: String(page) });
-    if (arr.length) params.set("moods", arr.join(","));
+    const g = Array.from(genres);
+    const s = Array.from(special);
+    if (g.length) params.set("genres",  g.join(","));
+    if (s.length) params.set("special", s.join(","));
     fetch(`/api/deck?${params}`)
       .then(r => r.json())
       .then(data => {
@@ -46,7 +53,7 @@ export default function SwipePage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [moods, moodsReady, page]);
+  }, [genres, special, filtersReady, page]);
 
   const handleShortlist = useCallback(async (tmdbId: number, film: FilmData) => {
     await fetch("/api/shortlist", {
@@ -97,25 +104,34 @@ export default function SwipePage() {
     if (data.match) setMatch(data.match);
   }, []);
 
-  function toggleMood(mood: Mood | "all") {
-    if (mood === "all") {
-      setPage(1);
-      setFilms([]);
-      setMoods(new Set());
-      sessionStorage.removeItem("reel_moods");
-      return;
-    }
-    setPage(1);
-    setFilms([]);
-    setMoods(prev => {
+  function toggleGenre(g: Genre) {
+    setPage(1); setFilms([]);
+    setGenres(prev => {
       const next = new Set(prev);
-      next.has(mood) ? next.delete(mood) : next.add(mood);
-      sessionStorage.setItem("reel_moods", JSON.stringify(Array.from(next)));
+      next.has(g) ? next.delete(g) : next.add(g);
+      sessionStorage.setItem("reel_genres", JSON.stringify(Array.from(next)));
       return next;
     });
   }
 
-  const allSelected = moods.size === 0;
+  function toggleSpecial(s: Special) {
+    setPage(1); setFilms([]);
+    setSpecial(prev => {
+      const next = new Set(prev);
+      next.has(s) ? next.delete(s) : next.add(s);
+      sessionStorage.setItem("reel_special", JSON.stringify(Array.from(next)));
+      return next;
+    });
+  }
+
+  function clearFilters() {
+    setPage(1); setFilms([]);
+    setGenres(new Set()); setSpecial(new Set());
+    sessionStorage.removeItem("reel_genres");
+    sessionStorage.removeItem("reel_special");
+  }
+
+  const totalFilters = genres.size + special.size;
 
   return (
     <div style={{
@@ -201,71 +217,64 @@ export default function SwipePage() {
         </div>
       )}
 
-      {/* Mood bar — includes REEL logo in its padding */}
+      {/* Slim filter bar */}
       <div style={{
-        paddingTop: 12,
-        paddingBottom: 8,
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+        padding: "10px 18px 8px",
         borderBottom: "1px solid #141414",
         flexShrink: 0,
       }}>
-        {/* Mood chips row */}
-        <div style={{
-          display: "flex",
-          gap: 6,
-          overflowX: "auto",
-          paddingLeft: 16,
-          paddingRight: 16,
-          scrollbarWidth: "none",
-          WebkitOverflowScrolling: "touch",
-        } as React.CSSProperties}>
-          {/* All Films chip */}
-          <button
-            onClick={() => toggleMood("all")}
-            style={{
-              flexShrink: 0,
-              background: allSelected ? "#1c1308" : "transparent",
-              border: `1px solid ${allSelected ? "#C9A96155" : "#252525"}`,
-              borderRadius: 2,
-              padding: "6px 14px",
-              color: allSelected ? "#C9A961" : "#3a3a3a",
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              cursor: "pointer",
-              letterSpacing: "0.03em",
-              transition: "all 0.15s ease",
-              whiteSpace: "nowrap",
-            }}
-          >
-            All Films
-          </button>
-
-          {MOODS.map(mood => {
-            const on = moods.has(mood);
-            return (
-              <button
-                key={mood}
-                onClick={() => toggleMood(mood)}
-                style={{
-                  flexShrink: 0,
-                  background: on ? "#1c1308" : "transparent",
-                  border: `1px solid ${on ? "#C9A96155" : "#252525"}`,
-                  borderRadius: 2,
-                  padding: "6px 14px",
-                  color: on ? "#C9A961" : "#3a3a3a",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  letterSpacing: "0.03em",
-                  transition: "all 0.15s ease",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {mood}
-              </button>
-            );
-          })}
-        </div>
+        <button
+          onClick={() => setFilterOpen(o => !o)}
+          style={{
+            background: totalFilters > 0 ? "#1c1308" : "transparent",
+            border: `1px solid ${totalFilters > 0 ? "#C9A96155" : "#252525"}`,
+            borderRadius: 2,
+            padding: "5px 12px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            color: totalFilters > 0 ? "#C9A961" : "#3a3a3a",
+          }}>
+            Filters
+          </span>
+          {totalFilters > 0 && (
+            <span style={{
+              background: "#C9A961",
+              color: "#0A0A0A",
+              fontFamily: "var(--font-mono)",
+              fontSize: 8,
+              borderRadius: 10,
+              padding: "1px 6px",
+              letterSpacing: "0.04em",
+              lineHeight: 1.6,
+            }}>
+              {totalFilters}
+            </span>
+          )}
+        </button>
       </div>
+
+      <FilterPanel
+        open={filterOpen}
+        genres={genres}
+        special={special}
+        onToggleGenre={toggleGenre}
+        onToggleSpecial={toggleSpecial}
+        onClear={clearFilters}
+        onClose={() => setFilterOpen(false)}
+      />
 
       {/* Deck — flex:1 */}
       {loading && films.length === 0 ? (

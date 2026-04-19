@@ -107,3 +107,30 @@ export async function POST(request: NextRequest) {
 
   return Response.json({ match: null });
 }
+
+export async function DELETE(request: NextRequest) {
+  const { tmdbId } = await request.json();
+  if (!tmdbId) return Response.json({ error: "Invalid params" }, { status: 400 });
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Find the imdb_id for this tmdb film
+  const { data: movie } = await supabase
+    .from("movies")
+    .select("imdb_id")
+    .eq("tmdb_id", tmdbId)
+    .maybeSingle();
+
+  // Also try the numeric placeholder (String(tmdbId)) in case movie was just upserted
+  const imdbId = movie?.imdb_id ?? String(tmdbId);
+
+  await supabase
+    .from("swipes")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("imdb_id", imdbId);
+
+  return Response.json({ ok: true });
+}

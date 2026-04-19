@@ -6,12 +6,14 @@ import SwipeCard, { type FilmData } from "./SwipeCard";
 interface SwipeDeckProps {
   films:    FilmData[];
   onSwipe:  (tmdbId: number, direction: "like" | "pass", film: FilmData) => void;
+  onUndo?:  (tmdbId: number) => void;
   onEmpty?: () => void;
 }
 
-export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
+export default function SwipeDeck({ films, onSwipe, onUndo, onEmpty }: SwipeDeckProps) {
   // Internal queue — append incoming films, remove swiped ones
-  const [queue, setQueue] = useState<FilmData[]>([]);
+  const [queue, setQueue]           = useState<FilmData[]>([]);
+  const [lastSwiped, setLastSwiped] = useState<FilmData | null>(null);
   const triggerRef        = useRef<((dir: "like" | "pass") => void) | null>(null);
   const triggerDetailsRef = useRef<(() => void) | null>(null);
 
@@ -27,15 +29,22 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
   const handleSwipe = useCallback(
     (direction: "like" | "pass", film: FilmData) => {
       onSwipe(film.tmdbId, direction, film);
+      setLastSwiped(film);
       setQueue(prev => {
         const next = prev.filter(f => f.tmdbId !== film.tmdbId);
-        // Load more when running low
         if (next.length <= 5) onEmpty?.();
         return next;
       });
     },
     [onSwipe, onEmpty]
   );
+
+  const handleUndo = useCallback(() => {
+    if (!lastSwiped) return;
+    onUndo?.(lastSwiped.tmdbId);
+    setQueue(prev => [lastSwiped, ...prev.filter(f => f.tmdbId !== lastSwiped.tmdbId)]);
+    setLastSwiped(null);
+  }, [lastSwiped, onUndo]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -97,17 +106,19 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
         ))}
       </div>
 
-      {/* Buttons — ✕ and ♥ only */}
+      {/* Buttons */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 24,
+        gap: 20,
         padding: "10px 0 18px",
         flexShrink: 0,
       }}>
         <Btn onClick={() => triggerRef.current?.("pass")}
           size={56} color="#5A5550" bg="#111" border="#202020">✕</Btn>
+        <Btn onClick={handleUndo} disabled={!lastSwiped}
+          size={44} color={lastSwiped ? "#7a6a5a" : "#2a2a2a"} bg="#0e0e0e" border={lastSwiped ? "#3a3030" : "#1a1a1a"}>↩</Btn>
         <Btn onClick={() => triggerRef.current?.("like")}
           size={66} color="#C9A961" bg="#14100a" border="#C9A96140"
           shadow="0 0 24px #C9A96118">♥</Btn>
@@ -116,7 +127,7 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
   );
 }
 
-function Btn({ children, onClick, size, color, bg, border, shadow }: {
+function Btn({ children, onClick, size, color, bg, border, shadow, disabled }: {
   children: React.ReactNode;
   onClick?: () => void;
   size: number;
@@ -124,26 +135,29 @@ function Btn({ children, onClick, size, color, bg, border, shadow }: {
   bg: string;
   border: string;
   shadow?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
         width: size, height: size,
         borderRadius: "50%",
         background: bg,
         border: `1px solid ${border}`,
         color,
-        fontSize: size > 60 ? 26 : 22,
-        cursor: "pointer",
+        fontSize: size > 60 ? 26 : size > 50 ? 22 : 18,
+        cursor: disabled ? "default" : "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         boxShadow: shadow ?? "none",
         flexShrink: 0,
         transition: "transform 0.1s ease",
+        opacity: disabled ? 0.4 : 1,
       }}
-      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.06)"; }}
+      onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.06)"; }}
       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
     >
       {children}

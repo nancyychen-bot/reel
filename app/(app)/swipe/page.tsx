@@ -48,6 +48,14 @@ export default function SwipePage() {
       .catch(() => setLoading(false));
   }, [moods, moodsReady, page]);
 
+  const handleUndo = useCallback(async (tmdbId: number) => {
+    await fetch("/api/swipe", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tmdbId }),
+    });
+  }, []);
+
   const handleSwipe = useCallback(async (tmdbId: number, direction: "like" | "pass", film: FilmData) => {
     const res = await fetch("/api/swipe", {
       method: "POST",
@@ -259,6 +267,7 @@ export default function SwipePage() {
         <SwipeDeck
           films={films}
           onSwipe={handleSwipe}
+          onUndo={handleUndo}
           onEmpty={() => setPage(p => p + 1)}
         />
       )}

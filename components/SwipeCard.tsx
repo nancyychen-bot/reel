@@ -123,14 +123,14 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
       const absX = Math.abs(x);
       const absY = Math.abs(y);
       if (absX > THRESHOLD && absX >= absY) {
-        // Horizontal swipe — like or pass
+        // Horizontal swipe — always works, collapses panel first
+        setDetails(false);
         const dir = x > 0 ? "right" : "left";
         setExiting(dir);
         setTimeout(() => onSwipe(dir === "right" ? "like" : "pass", film), 430);
-      } else if (absY > 60 && absY > absX) {
-        // Vertical gesture — toggle detail panel
-        if (y > 0) setDetails(true);   // swipe down = open
-        else       setDetails(false);  // swipe up   = close
+      } else if (!details && y > 50 && absY > absX) {
+        // Swipe down (panel closed) — open panel
+        setDetails(true);
         dragRef.current = { x: 0, y: 0 };
         setDragState({ x: 0, y: 0 });
       } else {
@@ -196,6 +196,7 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
           overflow: "hidden",
           background: "#0c0c0c",
           boxShadow: "0 30px 70px rgba(0,0,0,0.75), 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)",
+          touchAction: "none", // tell iOS not to scroll — must be set before touchstart fires
         }}
         onMouseDown={onPointerDown}
         onTouchStart={onPointerDown}
@@ -348,7 +349,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
             overflowY: "auto",
           }}
           onMouseDown={e => e.stopPropagation()}
-          onTouchStart={e => e.stopPropagation()}
         >
           <p style={{
             fontFamily: "var(--font-sans)", fontSize: 15,

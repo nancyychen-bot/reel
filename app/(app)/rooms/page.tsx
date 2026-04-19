@@ -8,6 +8,8 @@ export default function RoomsPage() {
   const router = useRouter();
   const [joinCode, setJoinCode] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const supabase = createClient();
 
@@ -17,7 +19,8 @@ export default function RoomsPage() {
     const res = await fetch("/api/rooms/create", { method: "POST" });
     if (!res.ok) { setError("Failed to create room."); setCreating(false); return; }
     const { code } = await res.json();
-    router.push(`/room/${code}`);
+    setCreatedCode(code);
+    setCreating(false);
   }
 
   async function joinRoom(e: React.FormEvent) {
@@ -29,8 +32,92 @@ export default function RoomsPage() {
     router.push(`/room/${code}`);
   }
 
+  function copyLink(code: string) {
+    navigator.clipboard.writeText(`${location.origin}/room/${code}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
+
+  // — Room created state —
+  if (createdCode) {
+    return (
+      <div style={{
+        position: "absolute", inset: 0,
+        background: "#0A0A0A",
+        display: "flex", flexDirection: "column",
+        paddingBottom: 70,
+      }}>
+        <header style={{ padding: "24px 24px 20px", borderBottom: "1px solid rgba(245,241,234,0.06)" }}>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#5A5550", letterSpacing: "0.12em", marginBottom: 4 }}>
+            Room created
+          </p>
+          <h1 style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 36,
+            color: "#F5F1EA",
+            letterSpacing: "0.12em",
+          }}>
+            {createdCode}
+          </h1>
+        </header>
+
+        <div style={{ padding: "36px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <p style={{ fontFamily: "var(--font-sans)", fontSize: 14, color: "#5A5550", lineHeight: 1.7 }}>
+            Share this code or link with a friend. Once they join, you'll both swipe the same deck at the same time.
+          </p>
+
+          {/* Share link button */}
+          <button
+            onClick={() => copyLink(createdCode)}
+            style={{
+              background: "transparent",
+              border: `1px solid ${copied ? "#C9A96155" : "rgba(245,241,234,0.12)"}`,
+              color: copied ? "#C9A961" : "#8A8580",
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              padding: "14px",
+              cursor: "pointer",
+              borderRadius: 2,
+              transition: "all 0.2s ease",
+            }}
+          >
+            {copied ? "Link copied!" : `Copy link  ·  /room/${createdCode}`}
+          </button>
+
+          {/* Enter room button */}
+          <button
+            onClick={() => router.push(`/room/${createdCode}`)}
+            style={{
+              background: "#8B2A2A",
+              border: "none",
+              color: "#F5F1EA",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              padding: "18px",
+              cursor: "pointer",
+              borderRadius: 2,
+              marginTop: 8,
+            }}
+          >
+            Enter room →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // — Default state —
   return (
-    <div style={{ minHeight: "100vh", background: "#0A0A0A" }}>
+    <div style={{
+      position: "absolute", inset: 0,
+      background: "#0A0A0A",
+      overflowY: "auto",
+      paddingBottom: 70,
+    }}>
       <header style={{ padding: "24px 24px 20px", borderBottom: "1px solid rgba(245,241,234,0.06)" }}>
         <h1 style={{
           fontFamily: "var(--font-serif)",
@@ -98,7 +185,7 @@ export default function RoomsPage() {
             <input
               value={joinCode}
               onChange={e => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="DUNE-42X"
+              placeholder="LENS-84Y"
               maxLength={10}
               style={{
                 flex: 1,

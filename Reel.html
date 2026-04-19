@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <template id="__bundler_thumbnail" data-bg-color="#E8453C">
+    <svg viewBox="0 0 390 844" xmlns="http://www.w3.org/2000/svg">
+      <rect width="390" height="844" fill="#E8453C"/>
+      <!-- Film reel -->
+      <circle cx="195" cy="380" r="180" stroke="#1a0505" stroke-width="5" fill="none"/>
+      <circle cx="195" cy="380" r="58" stroke="#1a0505" stroke-width="4" fill="none"/>
+      <circle cx="195" cy="200" r="24" stroke="#1a0505" stroke-width="3.5" fill="none"/>
+      <circle cx="195" cy="560" r="24" stroke="#1a0505" stroke-width="3.5" fill="none"/>
+      <circle cx="39"  cy="290" r="24" stroke="#1a0505" stroke-width="3.5" fill="none"/>
+      <circle cx="351" cy="290" r="24" stroke="#1a0505" stroke-width="3.5" fill="none"/>
+      <circle cx="39"  cy="470" r="24" stroke="#1a0505" stroke-width="3.5" fill="none"/>
+      <circle cx="351" cy="470" r="24" stroke="#1a0505" stroke-width="3.5" fill="none"/>
+      <!-- REEL text -->
+      <text x="48" y="790" font-family="sans-serif" font-weight="900" font-size="120" fill="#1a0505" letter-spacing="8">REEL</text>
+    </svg>
+  </template>
+  <title>Reel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400&family=Space+Grotesk:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&family=Playfair+Display+SC:wght@400;700;900&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,900;1,6..96,400;1,6..96,900&family=Abril+Fatface&family=Bebas+Neue&family=Italiana&family=Pirata+One&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; width: 100%; background: #030303; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #root {
+      width: min(100vw, 390px); height: 100dvh;
+      position: relative; overflow: hidden; background: #0A0A0A;
+    }
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(18px) } to { opacity:1; transform:translateY(0) } }
+    @keyframes fadeIn   { from { opacity:0 } to { opacity:1 } }
+    @keyframes matchIn  { from { opacity:0; transform:scale(0.96) } to { opacity:1; transform:scale(1) } }
+    @keyframes grainPulse { 0%,100%{opacity:0.035} 50%{opacity:0.055} }
+    @keyframes toast-in   { from { opacity:0; transform:translateY(-12px) } to { opacity:1; transform:translateY(0) } }
+    @keyframes progress-drain { from { width:100% } to { width:0% } }
+    .fade-up  { animation: fadeUp  0.4s cubic-bezier(0.22,1,0.36,1) both; }
+    .fade-in  { animation: fadeIn  0.3s ease both; }
+    .match-in { animation: matchIn 0.55s cubic-bezier(0.22,1,0.36,1) both; }
+    input[type=range] { -webkit-appearance:none; width:100%; height:2px; background:#2a2a2a; border-radius:1px; outline:none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; background:#C9A961; border-radius:50%; cursor:pointer; }
+    input[type=checkbox] { accent-color:#C9A961; }
+    ::-webkit-scrollbar { width:0; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── TWEAK DEFAULTS ────────────────────────────────────────────────────────────
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "tmdbKey": "077ff40bbafc12dc3fd593f3f00490b4",
+  "matchChance": 30,
+  "accentColor": "#8B2A2A",
+  "landingPalette": "cobalt",
+  "bodyFont": "a",
+  "logoFont": "d",
+  "illustration": "c"
+}/*EDITMODE-END*/;
+
+const PALETTES = {
+  cobalt: { bg:'#1e3db0', ink:'#0b1840', ctaBg:'#E8453C', ctaText:'#fff',
+    title:'#F5F1EA', sub:'rgba(245,241,234,0.72)', label:'rgba(245,241,234,0.32)' },
+  coral:  { bg:'#E8453C', ink:'#1a0505', ctaBg:'#1a0505', ctaText:'#F5F1EA',
+    title:'#F5F1EA', sub:'rgba(245,241,234,0.78)', label:'rgba(245,241,234,0.38)' },
+  gold:   { bg:'#F0A820', ink:'#1a0c00', ctaBg:'#1e3db0', ctaText:'#F5F1EA',
+    title:'#1a0c00', sub:'rgba(26,12,0,0.62)', label:'rgba(26,12,0,0.32)' },
+};
+
+const BODY_FONTS = {
+  a: { family:"'Figtree', sans-serif",          label:'Figtree'        },
+  b: { family:"'Space Grotesk', sans-serif",    label:'Space Grotesk'  },
+  c: { family:"'DM Serif Display', serif",      label:'DM Serif'       },
+};
+
+const LOGO_FONTS = {
+  a: { family:"'Playfair Display SC',serif",   weight:900, style:'normal',  size:72,  tracking:'0.06em',  transform:'uppercase', label:'Playfair SC'   },
+  b: { family:"'Bodoni Moda',serif",            weight:900, style:'italic',  size:90,  tracking:'-0.03em', transform:'none',      label:'Bodoni Moda'   },
+  c: { family:"'Abril Fatface',serif",          weight:400, style:'normal',  size:84,  tracking:'-0.01em', transform:'none',      label:'Abril Fatface' },
+  d: { family:"'Bebas Neue',sans-serif",        weight:400, style:'normal',  size:96,  tracking:'0em',  transform:'uppercase', label:'Bebas Neue'    },
+  e: { family:"'Italiana',serif",               weight:400, style:'normal',  size:88,  tracking:'0.04em',  transform:'none',      label:'Italiana'      },
+  f: { family:"'Pirata One',cursive",           weight:400, style:'normal',  size:82,  tracking:'0.01em',  transform:'none',      label:'Pirata One'    },
+};
+
+// ── FILM DATA ─────────────────────────────────────────────────────────────────
+const FILMS = [
+  { id:'tt0079944', num:'001', title:'Stalker', year:1979, director:'Andrei Tarkovsky',
+    runtime:162, genres:['Drama','Sci-Fi'], imdbRating:'8.1', rt:100, country:'Soviet Union', language:'Russian', awards:'Jury Prize, Cannes 1980 · BAFTA nomination for Best Foreign Language Film · Ranked in Sight & Sound’s Greatest Films of All Time',
+    plot:'A mysterious guide known only as the Stalker leads a Writer and a Professor through a forbidden wasteland called the Zone — a place where the laws of physics bend and a room said to grant one’s deepest wish waits at the center. The journey is as much psychological as physical, each man confronting what he truly wants, and whether he deserves it.',
+    bg:'radial-gradient(ellipse at 38% 40%, #2a4a22 0%, #0f2009 50%, #060d04 100%)',
+    glow:'#3a6a2e', accent:'#7cc07a' },
+  { id:'tt0166924', num:'002', title:'Mulholland Drive', year:2001, director:'David Lynch',
+    runtime:147, genres:['Drama','Mystery','Thriller'], imdbRating:'7.9', rt:83, country:'USA / France', language:'English', awards:'Best Director, Cannes 2001 · National Society of Film Critics Best Film · AFI Top 10 Films of the 21st Century · Empire’s Greatest Films list',
+    plot:'A blonde woman survives a car crash on Mulholland Drive and wanders amnesiac into a Hollywood actress’s apartment. Together they follow a trail of clues through the city’s dark underbelly, where identity, desire and reality spiral into something impossible to untangle. Lynch’s most hypnotic portrait of the dream factory and its casualties.',
+    bg:'radial-gradient(ellipse at 65% 30%, #2e0a45 0%, #180525 55%, #080210 100%)',
+    glow:'#7030b8', accent:'#c080e8' },
+  { id:'tt0062622', num:'003', title:'2001: A Space Odyssey', year:1968, director:'Stanley Kubrick',
+    runtime:149, genres:['Drama','Sci-Fi'], imdbRating:'8.3', rt:92, country:'UK / USA', language:'English', awards:'Academy Award for Best Visual Effects · AFI 15th Greatest Film of All Time · Inducted into the US National Film Registry · Roger Ebert’s 10 Greatest Films',
+    plot:"Humanity's first encounter with a mysterious monolith triggers an odyssey beyond Jupiter — and the boundaries of consciousness.",
+    bg:'radial-gradient(ellipse at 50% 22%, #0e2040 0%, #061020 55%, #020508 100%)',
+    glow:'#1848a8', accent:'#5090d8' },
+  { id:'tt0234215', num:'004', title:'In the Mood for Love', year:2000, director:'Wong Kar-wai',
+    runtime:99, genres:['Drama','Romance'], imdbRating:'8.1', rt:90, country:'Hong Kong', language:'Cantonese', awards:'Best Actor (Tony Leung), Cannes 2000 · BAFTA nomination Best Film Not in English · #1 on BBC’s 100 Greatest Films of the 21st Century · Inducted into the Criterion Collection',
+    plot:'1960s Hong Kong. Journalist Mr. Chow and his neighbor Mrs. Chan quietly discover that their spouses are having an affair with each other. Bound by propriety and unspoken desire, they rehearse what their unfaithful partners might have said — until the boundary between pretending and feeling collapses entirely. A film about everything that goes unsaid.’s evolution is guided by a mysterious black monolith of unknown origin. A crew of astronauts — aided and ultimately endangered by the eerily calm supercomputer HAL 9000 — journey to Jupiter in search of answers, only to cross a threshold that defies human language.’ affair, draw closer in a restrained and aching dance of longing.',
+    bg:'radial-gradient(ellipse at 42% 55%, #481008 0%, #2a0804 55%, #100302 100%)',
+    glow:'#b03018', accent:'#d87050' },
+  { id:'tt0081505', num:'005', title:'The Shining', year:1980, director:'Stanley Kubrick',
+    runtime:146, genres:['Drama','Horror'], imdbRating:'8.4', rt:83, country:'UK / USA', language:'English', awards:'Saturn Award for Best Horror Film · Inducted into the US National Film Registry · AFI’s 100 Years...100 Thrills list · Empire’s 100 Best Films of World Cinema',
+    plot:'Struggling writer Jack Torrance takes a winter caretaker posting at the remote Overlook Hotel, bringing his wife and his psychically gifted young son Danny. As snowdrifts seal the family inside, Jack’s grip on reality loosens and a violent madness takes hold. Danny’s gift — an ability to see the hotel’s murderous past — may be their only way out.',
+    bg:'radial-gradient(ellipse at 50% 45%, #0e1e2e 0%, #060e18 55%, #030508 100%)',
+    glow:'#284860', accent:'#7090b0' },
+  { id:'tt2798920', num:'006', title:'Annihilation', year:2018, director:'Alex Garland',
+    runtime:115, genres:['Sci-Fi','Horror'], imdbRating:'6.8', rt:88, country:'USA / UK', language:'English', awards:'Critics’ Choice Award for Best Sci-Fi/Horror Film · Hugo Award for Best Dramatic Presentation · Named one of the best films of the decade by multiple critics’ polls',
+    plot:'Lena, a biologist and former soldier, joins a secret expedition into "the Shimmer" — a spreading environmental zone surrounding a crashed meteor where biology mutates in impossible ways. Plants grow in human form. Animals carry human voices. And the boundary between self and other dissolves entirely the further inward the team travels.',
+    bg:'radial-gradient(ellipse at 35% 45%, #0a2820 0%, #051510 55%, #020808 100%)',
+    glow:'#188860', accent:'#48c898' },
+  { id:'tt8106534', num:'007', title:'Portrait of a Lady on Fire', year:2019, director:'Céline Sciamma',
+    runtime:122, genres:['Drama','Romance'], imdbRating:'8.1', rt:98, country:'France', language:'French', awards:'BAFTA Award for Best Film Not in the English Language · Best Screenplay & Queer Palm, Cannes 2019 · César Award for Best Original Score · Named best film of 2019 by dozens of publications',
+    plot:'France, 1770. Painter Marianne is commissioned to secretly complete a wedding portrait of Héloïse — a young woman just released from a convent who refuses to sit for the work. Posing as a companion, Marianne observes her by day and paints from memory at night, until the act of looking becomes the act of falling.',
+    bg:'radial-gradient(ellipse at 55% 38%, #3e1008 0%, #221008 55%, #0e0602 100%)',
+    glow:'#b84010', accent:'#e07840' },
+  { id:'tt7282468', num:'008', title:'Burning', year:2018, director:'Lee Chang-dong',
+    runtime:148, genres:['Drama','Mystery'], imdbRating:'7.5', rt:95, country:'South Korea', language:'Korean', awards:'FIPRESCI International Critics Prize, Cannes 2018 · Korea’s submission for the Academy Award for Best International Film · Highest-rated film of 2018 on Rotten Tomatoes · Inducted into the Criterion Collection',
+    plot:'Jong-su, an aimless young writer, reconnects with a childhood neighbour who asks him to feed her cat while she travels. She returns from Africa with Ben — a wealthy, dangerously calm man who confesses to an unusual hobby: burning down disused greenhouses. When she vanishes, Jong-su is left only with suspicion, obsession, and a mystery that may have no answer.',
+    bg:'radial-gradient(ellipse at 48% 60%, #301808 0%, #180c02 55%, #090500 100%)',
+    glow:'#986020', accent:'#c89040' },
+];
+
+const MOODS = ['Cozy','Intense','Weird','Romantic','Cerebral','Beautiful','Short','Foreign','Classic','Crowdpleaser','Feel-good','Dark','Mind-bending','Nostalgic','Epic','Understated','Slow Burn'];
+
+// ── GRAIN OVERLAY ─────────────────────────────────────────────────────────────
+function GrainOverlay() {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='turbulence' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23g)'/></svg>`;
+  return (
+    <div style={{
+      position:'fixed', inset:0, pointerEvents:'none', zIndex:9998,
+      backgroundImage:`url("data:image/svg+xml,${svg}")`,
+      backgroundRepeat:'repeat', opacity:0.045,
+      mixBlendMode:'overlay',
+      animation:'grainPulse 9s ease-in-out infinite',
+    }}/>
+  );
+}
+
+// ── FILM POSTER ───────────────────────────────────────────────────────────────
+function FilmPoster({ film, tmdbKey }) {
+  const [loaded,     setLoaded]     = useState(false);
+  const [err,        setErr]        = useState(false);
+  const [posterUrl,  setPosterUrl]  = useState(null);
+
+  useEffect(() => {
+    if (!tmdbKey) return;
+    setPosterUrl(null); setLoaded(false); setErr(false);
+    fetch(`https://api.themoviedb.org/3/find/${film.id}?api_key=${tmdbKey}&external_source=imdb_id`)
+      .then(r => r.json())
+      .then(d => {
+        const p = d.movie_results?.[0]?.poster_path;
+        if (p) setPosterUrl(`https://image.tmdb.org/t/p/w500${p}`);
+        else setErr(true);
+      })
+      .catch(() => setErr(true));
+  }, [film.id, tmdbKey]);
+
+  const showReal = posterUrl && !err;
+
+  return (
+    <div style={{ width:'100%', height:'100%', position:'relative', overflow:'hidden', background: film.bg }}>
+      {showReal && (
+        <img src={posterUrl} onLoad={() => setLoaded(true)} onError={() => setErr(true)}
+          style={{ position:'absolute', inset:0, width:'100%', height:'100%',
+            objectFit:'cover', opacity: loaded ? 1 : 0, transition:'opacity 0.5s ease' }} />
+      )}
+
+      {/* Abstract treatment — always rendered, fades out when real poster loads */}
+      <div style={{ position:'absolute', inset:0, opacity: showReal && loaded ? 0 : 1, transition:'opacity 0.5s ease' }}>
+        {/* film-leader top strip */}
+        <div style={{
+          position:'absolute', top:0, left:0, right:0, height:3,
+          background:`linear-gradient(to right, transparent, ${film.glow}80, transparent)`,
+        }}/>
+        {/* Index + year */}
+        <div style={{
+          position:'absolute', top:22, left:22,
+          fontFamily:"'JetBrains Mono',monospace", fontSize:10,
+          color:film.accent, letterSpacing:'0.15em', opacity:0.7,
+        }}>{film.num} ── {film.year}</div>
+        {/* Director name top right */}
+        <div style={{
+          position:'absolute', top:22, right:22,
+          fontFamily:"'JetBrains Mono',monospace", fontSize:10,
+          color:film.accent, letterSpacing:'0.1em', opacity:0.4,
+          textTransform:'uppercase',
+        }}>{film.director.split(' ').pop()}</div>
+        {/* Glowing orb */}
+        <div style={{
+          position:'absolute', top:'28%', left:'50%',
+          transform:'translate(-50%,-50%)',
+          width:180, height:180, borderRadius:'50%',
+          background:`radial-gradient(circle, ${film.glow}55 0%, transparent 70%)`,
+          filter:'blur(28px)',
+        }}/>
+        {/* Oversized italic title — texture layer */}
+        <div style={{
+          position:'absolute', bottom:'25%', left:-6,
+          fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)',
+          fontSize: film.title.length > 16 ? '13vw' : '17vw',
+          color:film.accent, opacity:0.1,
+          whiteSpace:'nowrap', lineHeight:1, letterSpacing:'var(--font-display-tracking)',
+          textTransform:'var(--font-display-transform)',
+          userSelect:'none', pointerEvents:'none',
+        }}>{film.title}</div>
+      </div>
+
+      {/* Vignette */}
+      <div style={{
+        position:'absolute', inset:0,
+        background:'radial-gradient(ellipse at 50% 28%, transparent 28%, rgba(0,0,0,0.6) 100%)',
+      }}/>
+      {/* Bottom fade into info panel */}
+      <div style={{
+        position:'absolute', bottom:0, left:0, right:0, height:'50%',
+        background:`linear-gradient(to top, #0A0A0A 0%, transparent 100%)`,
+      }}/>
+    </div>
+  );
+}
+
+// ── SWIPE CARD ────────────────────────────────────────────────────────────────
+function SwipeCard({ film, isTop, stackIndex, onSwipe, tmdbKey }) {
+  const [dragState, setDragState] = useState({ x:0, y:0 });
+  const dragRef    = useRef({ x:0, y:0 });
+  const startRef   = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [exiting,  setExiting]  = useState(null);
+  const [details,  setDetails]  = useState(false);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e) => {
+      const cx = e.clientX ?? e.touches?.[0]?.clientX;
+      const cy = e.clientY ?? e.touches?.[0]?.clientY;
+      if (cx == null) return;
+      const dx = cx - startRef.current.x;
+      const dy = cy - startRef.current.y;
+      dragRef.current = { x:dx, y:dy };
+      setDragState({ x:dx, y:dy });
+    };
+    const up = () => {
+      setDragging(false);
+      const { x } = dragRef.current;
+      if (Math.abs(x) > 108) {
+        const dir = x > 0 ? 'right' : 'left';
+        setExiting(dir);
+        setTimeout(() => onSwipe(dir === 'right' ? 'like' : 'pass', film), 430);
+      } else {
+        dragRef.current = { x:0, y:0 };
+        setDragState({ x:0, y:0 });
+      }
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup',   up);
+    document.addEventListener('touchmove', move, { passive:true });
+    document.addEventListener('touchend',  up);
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup',   up);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('touchend',  up);
+    };
+  }, [dragging]);
+
+  const onPointerDown = (e) => {
+    if (!isTop || exiting) return;
+    const cx = e.clientX ?? e.touches?.[0]?.clientX;
+    const cy = e.clientY ?? e.touches?.[0]?.clientY;
+    startRef.current = { x:cx, y:cy };
+    dragRef.current  = { x:0,  y:0  };
+    setDragging(true);
+  };
+
+  // Geometry
+  const sx = dragState.x, sy = dragState.y;
+  const rot = sx / 20;
+  const likeOp  = Math.max(0, Math.min(1, sx / 90));
+  const passOp  = Math.max(0, Math.min(1, -sx / 90));
+  const stackSc = 1 - stackIndex * 0.04;
+  const stackTy = stackIndex * -16;
+
+  let tf;
+  if      (exiting === 'right') tf = 'translateX(135vw) rotate(22deg)';
+  else if (exiting === 'left')  tf = 'translateX(-135vw) rotate(-22deg)';
+  else if (!isTop)              tf = `scale(${stackSc}) translateY(${stackTy}px)`;
+  else                          tf = `translateX(${sx}px) translateY(${sy * 0.12}px) rotate(${rot}deg)`;
+
+  const trans = dragging ? 'none' : 'transform 0.48s cubic-bezier(0.25,0.46,0.45,0.94)';
+
+  return (
+    <div style={{
+      position:'absolute', inset:0,
+      transform:tf, transition:trans,
+      zIndex: 10 - stackIndex,
+      cursor: isTop ? (dragging ? 'grabbing' : 'grab') : 'default',
+      userSelect:'none',
+    }}>
+      <div
+        style={{
+          position:'absolute', inset:'0 14px',
+          borderRadius:5, overflow:'hidden',
+          background:'#0c0c0c',
+          boxShadow:`0 30px 70px rgba(0,0,0,0.75), 0 8px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)`,
+        }}
+        onMouseDown={onPointerDown}
+        onTouchStart={onPointerDown}
+      >
+        {/* Poster area */}
+        <div style={{ position:'absolute', inset:'0 0 118px', overflow:'hidden' }}>
+          <FilmPoster film={film} tmdbKey={tmdbKey}/>
+        </div>
+
+        {/* LIKE stamp */}
+        <div style={{
+          position:'absolute', top:38, left:24,
+          border:`2px solid ${film.accent}`,
+          color:film.accent,
+          fontFamily:'var(--font-display)', fontWeight:'var(--font-display-weight)',
+          fontSize:18, letterSpacing:'var(--font-display-tracking)',
+          padding:'3px 10px', borderRadius:2,
+          opacity:likeOp, transform:'rotate(-14deg)',
+          transition: dragging ? 'none' : 'opacity 0.1s',
+        }}>LIKE</div>
+
+        {/* PASS stamp */}
+        <div style={{
+          position:'absolute', top:38, right:24,
+          border:'2px solid #6a6560', color:'#6a6560',
+          fontFamily:'var(--font-display)', fontWeight:'var(--font-display-weight)',
+          fontSize:18, letterSpacing:'var(--font-display-tracking)',
+          padding:'3px 10px', borderRadius:2,
+          opacity:passOp, transform:'rotate(14deg)',
+          transition: dragging ? 'none' : 'opacity 0.1s',
+        }}>PASS</div>
+
+        {/* Info panel */}
+        <div style={{
+          position:'absolute', bottom:0, left:0, right:0, height:118,
+          background:'#0A0A0A', borderTop:'1px solid #181818',
+          padding:'14px 20px 16px', zIndex:5,
+        }}>
+          <div style={{
+            fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)',
+            fontSize:24, color:'#F5F1EA', lineHeight:1.05,
+            letterSpacing:'-0.01em', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+            marginBottom:5,
+          }}>{film.title}</div>
+          <div style={{
+            fontFamily:"'JetBrains Mono',monospace", fontSize:10,
+            color:'#5A5550', letterSpacing:'0.07em',
+          }}>{film.director}</div>
+          <div style={{
+            fontFamily:"'JetBrains Mono',monospace", fontSize:10,
+            color:'#3a3a3a', letterSpacing:'0.07em', marginTop:3,
+          }}>{film.country} · {film.year}</div>
+        </div>
+
+        {/* Detail panel (swipe up) */}
+        <div style={{
+          position:'absolute', left:0, right:0,
+          bottom: details ? 0 : -500,
+          height:500,
+          background:`linear-gradient(to bottom, transparent 0px, ${film.bg.slice(0, film.bg.indexOf(',') > 0 ? film.bg.indexOf(',') : 999).replace('radial-gradient(','').replace('ellipse at 38% 40%,','').trim()} 0%, #0A0A0A 60px)`,
+          backdropFilter:'blur(24px) brightness(0.7)',
+          backgroundColor:'rgba(8,8,8,0.92)',
+          transition:'bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)',
+          padding:'50px 22px 24px',
+          cursor:'default', zIndex:10,
+        }}
+          onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+        >
+          <p style={{
+            fontFamily:'var(--font-body)', fontSize:14,
+            color:'#9A9590', lineHeight:1.7, textWrap:'pretty', marginBottom:20,
+          }}>{film.plot}</p>
+
+          {/* Ratings */}
+          <div style={{ display:'flex', gap:20, marginBottom:18 }}>
+            <div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.12em', marginBottom:3 }}>IMDb RATING</div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:22, color:film.accent }}>{film.imdbRating}</div>
+            </div>
+            <div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.12em', marginBottom:3 }}>ROTTEN TOMATOES</div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:22, color:film.accent }}>{film.rt}%</div>
+            </div>
+          </div>
+
+          {/* Meta row */}
+          <div style={{ display:'flex', gap:16, marginBottom:14, flexWrap:'wrap' }}>
+            {[['RUNTIME', film.runtime + ' min'], ['LANGUAGE', film.language]].map(([k,v]) => (
+              <div key={k}>
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.1em', marginBottom:2 }}>{k}</div>
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, color:'#8A8580' }}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Genre chips */}
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:18 }}>
+            {film.genres.map(g => (
+              <span key={g} style={{
+                fontFamily:'var(--font-body)', fontSize:10, color:'#4a4a4a',
+                border:'1px solid #222', borderRadius:2, padding:'2px 8px',
+                letterSpacing:'0.05em', textTransform:'uppercase',
+              }}>{g}</span>
+            ))}
+          </div>
+
+          {/* Awards */}
+          {film.awards && (
+            <div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.12em', marginBottom:6 }}>AWARDS & RECOGNITION</div>
+              <p style={{ fontFamily:'var(--font-body)', fontSize:13, color:'#6a6560', lineHeight:1.6, textWrap:'pretty' }}>{film.awards}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Detail toggle — only on top card */}
+        {isTop && (
+          <button
+            onClick={() => setDetails(d => !d)}
+            onMouseDown={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+            style={{
+              position:'absolute',
+              bottom: details ? 560 : 120,
+              left:'50%', transform:'translateX(-50%)',
+              background:'transparent', border:'none',
+              color:'#3a3535', cursor:'pointer',
+              fontFamily:"'JetBrains Mono',monospace", fontSize:9,
+              letterSpacing:'0.14em', padding:'10px 16px',
+              transition:'bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)',
+              zIndex:15,
+            }}
+          >{details ? '▲  LESS' : '▼  MORE'}</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── MOOD BAR ──────────────────────────────────────────────────────────────────
+function MoodBar({ moods, onChange }) {
+  const active = moods || [];
+  const toggle = (m) => onChange(
+    active.includes(m) ? active.filter(x => x !== m) : [...active, m]
+  );
+  return (
+    <div style={{
+      paddingTop:46, paddingBottom:8,
+      borderBottom:'1px solid #141414',
+    }}>
+      <div style={{
+        display:'flex', gap:6, overflowX:'auto', paddingLeft:16, paddingRight:16,
+        scrollbarWidth:'none', WebkitOverflowScrolling:'touch',
+      }}>
+        {MOODS.map(m => {
+          const on = active.includes(m);
+          return (
+            <button key={m} onClick={() => toggle(m)} style={{
+              flexShrink:0,
+              background: on ? '#1c1308' : 'transparent',
+              border: on ? '1px solid #C9A96155' : '1px solid #252525',
+              borderRadius:2, padding:'6px 14px',
+              color: on ? '#C9A961' : '#3a3a3a',
+              fontFamily:'var(--font-body)', fontSize:12,
+              cursor:'pointer', letterSpacing:'0.03em',
+              transition:'all 0.15s ease', whiteSpace:'nowrap',
+            }}>{m}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── SWIPE DECK ────────────────────────────────────────────────────────────────
+function SwipeDeck({ onMatch, tmdbKey, matchChance }) {
+  const [queue,  setQueue]  = useState([...FILMS]);
+  const [liked,  setLiked]  = useState([]);
+  const [passed, setPassed] = useState([]);
+
+  const handleSwipe = useCallback((dir, film) => {
+    if (dir === 'like') {
+      setLiked(l => [...l, film]);
+      if (Math.random() * 100 < matchChance) setTimeout(() => onMatch(film), 280);
+    } else {
+      setPassed(p => [...p, film]);
+    }
+    setQueue(q => q.filter(f => f.id !== film.id));
+  }, [onMatch, matchChance]);
+
+  const forceSwipe = (dir) => {
+    if (queue.length === 0) return;
+    handleSwipe(dir, queue[0]);
+  };
+
+  if (queue.length === 0) return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:10 }}>
+      <div style={{ fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)', fontSize:30, color:'#F5F1EA', letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)' }}>That's the queue.</div>
+      <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#3a3a3a', letterSpacing:'0.1em' }}>
+        {liked.length} liked · {passed.length} passed
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
+      {/* Card stack */}
+      <div style={{ flex:1, position:'relative', margin:'8px 0 4px' }}>
+        {queue.slice(0,3).map((film, i) => (
+          <SwipeCard key={film.id} film={film} isTop={i===0} stackIndex={i}
+            onSwipe={handleSwipe} tmdbKey={tmdbKey}/>
+        ))}
+      </div>
+      {/* Buttons */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:24, padding:'10px 0 18px' }}>
+        <Btn onClick={() => forceSwipe('pass')} size={56} color="#5A5550" bg="#111" border="#202020">✕</Btn>
+        <Btn onClick={() => forceSwipe('like')} size={66} color="#C9A961" bg="#14100a" border="#C9A96140"
+          shadow="0 0 24px #C9A96118">♥</Btn>
+        <Btn size={56} color="#3a3a3a" bg="#111" border="#202020">↓</Btn>
+      </div>
+    </div>
+  );
+}
+
+function Btn({ children, onClick, size, color, bg, border, shadow }) {
+  return (
+    <button onClick={onClick} style={{
+      width:size, height:size, borderRadius:'50%',
+      background:bg, border:`1px solid ${border}`,
+      color, fontSize: size > 60 ? 24 : 20,
+      cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+      boxShadow: shadow || 'none',
+      transition:'transform 0.1s ease, opacity 0.1s ease',
+      flexShrink:0,
+    }}
+    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.06)'}
+    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+    >{children}</button>
+  );
+}
+
+// ── MATCH MODAL ───────────────────────────────────────────────────────────────
+function MatchToast({ film, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2200);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div style={{
+      position:'absolute', top:50, left:14, right:14, zIndex:500,
+      animation:'toast-in 0.3s cubic-bezier(0.22,1,0.36,1) both',
+    }}>
+      <div style={{
+        background:'#141414', border:`1px solid ${film.accent}40`,
+        borderRadius:4, padding:'12px 14px',
+        display:'flex', alignItems:'center', gap:12,
+        boxShadow:'0 8px 24px rgba(0,0,0,0.6)',
+      }}>
+        <div style={{ width:30, height:42, borderRadius:2, overflow:'hidden', flexShrink:0, position:'relative' }}>
+          <FilmPoster film={film} tmdbKey={null}/>
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:film.accent, letterSpacing:'0.18em', marginBottom:2 }}>MATCH</div>
+          <div style={{ fontFamily:'var(--font-display)', fontSize:14, color:'#F5F1EA', letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{film.title}</div>
+          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', marginTop:1 }}>{film.year}</div>
+        </div>
+        <div style={{ width:36, height:2, flexShrink:0, background:'#1a1a1a', borderRadius:1, overflow:'hidden' }}>
+          <div style={{ height:'100%', background:film.accent, animation:'progress-drain 2.2s linear forwards' }}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MOOD SELECTOR ─────────────────────────────────────────────────────────────
+function MoodSelector({ onConfirm }) {
+  const [sel, setSel] = useState([]);
+  const toggle = m => setSel(s => s.includes(m) ? s.filter(x=>x!==m) : [...s, m]);
+
+  return (
+    <div className="fade-in" style={{
+      position:'absolute', inset:0, zIndex:300,
+      background:'rgba(4,4,4,0.97)',
+      display:'flex', flexDirection:'column',
+      padding:'52px 24px 36px',
+    }}>
+      <div style={{
+        fontFamily:"'JetBrains Mono',monospace", fontSize:10,
+        color:'#3a3a3a', letterSpacing:'0.2em', marginBottom:10,
+      }}>TONIGHT</div>
+      <div style={{
+        fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)',
+        fontSize:34, color:'#F5F1EA', lineHeight:1.2, marginBottom:32,
+        textWrap:'pretty', letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)',
+      }}>What kind of film are you in the mood for?</div>
+
+      <div style={{ display:'flex', flexWrap:'wrap', gap:8, flex:1, alignContent:'flex-start' }}>
+        {MOODS.map(m => {
+          const active = sel.includes(m);
+          return (
+            <button key={m} onClick={() => toggle(m)} style={{
+              background: active ? '#1c1308' : 'transparent',
+              border: active ? '1px solid #C9A96155' : '1px solid #252525',
+              borderRadius:2, padding:'9px 18px',
+              color: active ? '#C9A961' : '#6a6560',
+              fontFamily:'var(--font-body)', fontSize:13,
+              cursor:'pointer', letterSpacing:'0.03em',
+              transition:'all 0.15s ease',
+            }}>{m}</button>
+          );
+        })}
+      </div>
+
+      <button onClick={() => onConfirm(sel)} style={{
+        height:52, borderRadius:3, border:'none', marginTop:24,
+        background: sel.length > 0 ? '#8B2A2A' : '#141414',
+        color: sel.length > 0 ? '#F5F1EA' : '#3a3a3a',
+        fontFamily:'var(--font-body)', fontSize:14, fontWeight:500,
+        letterSpacing:'0.08em', cursor:'pointer', transition:'all 0.2s ease',
+      }}>
+        {sel.length === 0 ? 'Skip — show me everything' : 'Start swiping'}
+      </button>
+    </div>
+  );
+}
+
+// ── LANDING ILLUSTRATION ──────────────────────────────────────────────────────
+const ILLUS_LABELS = { a:'Film Reel', b:'Gestural', c:'At Home', d:'Scattered' };
+
+// Shared SVG wrapper + filter
+function IllusWrap({ bg, children }) {
+  return (
+    <svg viewBox="0 0 390 620" preserveAspectRatio="xMidYMid slice"
+      style={{ position:'absolute', top:0, left:0, width:'100%', height:'72%', display:'block' }}
+      xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="hd" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="turbulence" baseFrequency="0.018" numOctaves="3" seed="5" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+        <linearGradient id="fade-down" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="52%" stopColor={bg} stopOpacity="0"/>
+          <stop offset="100%" stopColor="#0A0A0A" stopOpacity="1"/>
+        </linearGradient>
+      </defs>
+      <rect width="390" height="620" fill={bg}/>
+      {children}
+      <rect width="390" height="620" fill="url(#fade-down)"/>
+    </svg>
+  );
+}
+
+// A — Film Reel (original)
+function IllusA({ ink, bg }) {
+  return (
+    <IllusWrap bg={bg}>
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="195" cy="290" r="188" strokeWidth="5"/>
+        <circle cx="195" cy="290" r="62" strokeWidth="4.5"/>
+        <circle cx="195" cy="290" r="58" strokeWidth="0" fill={ink} opacity="0.08"/>
+        {[0,60,120,180,240,300].map((deg,i) => {
+          const r = deg*Math.PI/180, x=195+130*Math.cos(r), y=290+130*Math.sin(r);
+          return <circle key={i} cx={x} cy={y} r="26" strokeWidth="3.5"/>;
+        })}
+        {[0,60,120,180,240,300].map((deg,i) => {
+          const r=deg*Math.PI/180;
+          return <line key={i} x1={195+64*Math.cos(r)} y1={290+64*Math.sin(r)} x2={195+104*Math.cos(r)} y2={290+104*Math.sin(r)} strokeWidth="3.5"/>;
+        })}
+      </g>
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeWidth="3">
+        <rect x="-4" y="8" width="400" height="52" rx="3"/>
+        <rect x="-4" y="8" width="400" height="52" rx="3" fill={ink} opacity="0.07"/>
+        {[0,1,2,3,4,5,6,7,8,9].map(i=><rect key={i} x={8+i*40} y="16" width="18" height="36" rx="3" strokeWidth="2.5"/>)}
+      </g>
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeWidth="3.5" strokeLinecap="round">
+        <rect x="290" y="100" width="88" height="68" rx="3"/>
+        <rect x="290" y="88" width="88" height="18" rx="3" fill={ink} opacity="0.12"/>
+        <line x1="306" y1="88" x2="299" y2="106" strokeWidth="3"/>
+        <line x1="326" y1="88" x2="319" y2="106" strokeWidth="3"/>
+        <line x1="346" y1="88" x2="339" y2="106" strokeWidth="3"/>
+        <line x1="366" y1="88" x2="359" y2="106" strokeWidth="3"/>
+      </g>
+      <g filter="url(#hd)" stroke={ink} fill={bg} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+        <ellipse cx="92" cy="490" rx="22" ry="22"/>
+        <path d="M68,514 C62,538 64,572 66,590 L118,590 C120,572 122,538 116,514 C110,507 98,504 92,504 C86,504 74,507 68,514Z"/>
+        <ellipse cx="148" cy="487" rx="22" ry="22"/>
+        <path d="M124,510 C118,534 120,568 122,590 L174,590 C176,568 178,534 172,510 C166,503 154,500 148,500 C142,500 130,503 124,510Z"/>
+        <path d="M124,530 Q108,520 96,525" strokeWidth="3" fill="none"/>
+      </g>
+    </IllusWrap>
+  );
+}
+
+// B — Gestural: big loose abstract marks, very minimal
+function IllusB({ ink, bg }) {
+  return (
+    <IllusWrap bg={bg}>
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {/* Big sweeping arc — like a film leader countdown circle */}
+        <path d="M 40 480 Q 80 120 340 80" strokeWidth="7"/>
+        {/* Second arc, offset */}
+        <path d="M 20 520 Q 100 200 360 140" strokeWidth="5" opacity="0.5"/>
+        {/* Large imperfect circle — reel reference */}
+        <circle cx="280" cy="340" r="130" strokeWidth="6"/>
+        {/* Crosshair inside circle — film frame registration mark */}
+        <line x1="280" y1="210" x2="280" y2="470" strokeWidth="3" opacity="0.4"/>
+        <line x1="150" y1="340" x2="410" y2="340" strokeWidth="3" opacity="0.4"/>
+        <circle cx="280" cy="340" r="14" strokeWidth="4"/>
+        {/* Bold diagonal slash */}
+        <path d="M 30 580 L 200 50" strokeWidth="9" opacity="0.18"/>
+        {/* Small circle — top left, ticket punch hole ref */}
+        <circle cx="68" cy="130" r="36" strokeWidth="4"/>
+        {/* Dot cluster */}
+        <circle cx="68" cy="130" r="8" strokeWidth="0" fill={ink} opacity="0.3"/>
+        {/* Tick mark */}
+        <path d="M 100 520 L 124 550 L 170 490" strokeWidth="5"/>
+      </g>
+    </IllusWrap>
+  );
+}
+
+// C — At Home: two figures on a couch, TV, cozy
+function IllusC({ ink, bg }) {
+  return (
+    <IllusWrap bg={bg}>
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {/* TV / screen on a stand */}
+        <rect x="95" y="60" width="200" height="130" rx="6" strokeWidth="4.5"/>
+        <rect x="95" y="60" width="200" height="130" rx="6" fill={ink} opacity="0.08"/>
+        {/* TV stand */}
+        <line x1="175" y1="190" x2="165" y2="218" strokeWidth="4"/>
+        <line x1="215" y1="190" x2="225" y2="218" strokeWidth="4"/>
+        <line x1="148" y1="218" x2="242" y2="218" strokeWidth="4.5"/>
+        {/* Screen reflection glint */}
+        <path d="M 112 75 Q 130 68 148 75" strokeWidth="2.5" opacity="0.4"/>
+        {/* Couch — big chunky shape */}
+        <path d="M 20 470 Q 18 390 50 380 L 340 380 Q 372 390 370 470 L 370 530 L 20 530 Z" strokeWidth="4.5" fill={bg}/>
+        {/* Couch back cushion line */}
+        <path d="M 50 380 Q 195 365 340 380" strokeWidth="3" fill="none"/>
+        {/* Left armrest */}
+        <path d="M 20 470 Q 15 415 30 400 L 62 400 L 62 530 L 20 530 Z" strokeWidth="4" fill={bg}/>
+        {/* Right armrest */}
+        <path d="M 370 470 Q 375 415 360 400 L 328 400 L 328 530 L 370 530 Z" strokeWidth="4" fill={bg}/>
+        {/* Cushion divider */}
+        <line x1="195" y1="395" x2="195" y2="530" strokeWidth="2.5" opacity="0.4"/>
+
+        {/* Figure L — slouched, legs up */}
+        <ellipse cx="108" cy="348" rx="34" ry="36" strokeWidth="4"/>
+        <path d="M76,382 Q68,420 72,450 L144,450 Q148,420 140,382 Q128,368 108,366 Q88,368 76,382Z" strokeWidth="4" fill={bg}/>
+        {/* Legs up on couch */}
+        <path d="M 144 440 Q 190 420 240 425" strokeWidth="4" fill="none"/>
+        <ellipse cx="252" cy="428" rx="16" ry="12" strokeWidth="3.5"/>
+
+        {/* Figure R — leaning into L */}
+        <ellipse cx="272" cy="345" rx="34" ry="36" strokeWidth="4"/>
+        <path d="M240,379 Q232,419 236,449 L308,449 Q312,419 304,379 Q292,365 272,363 Q252,365 240,379Z" strokeWidth="4" fill={bg}/>
+        {/* Head leaning on L shoulder */}
+        <path d="M 242 370 Q 200 355 178 362" strokeWidth="3.5" fill="none"/>
+
+        {/* Blanket draped over both */}
+        <path d="M 68 445 Q 100 460 195 455 Q 270 460 312 448" strokeWidth="5" fill="none" strokeLinecap="round"/>
+
+        {/* Floor lamp — top right */}
+        <line x1="348" y1="370" x2="348" y2="240" strokeWidth="3.5"/>
+        <path d="M 318 240 Q 348 220 378 240" strokeWidth="3.5" fill={ink} opacity="0.15"/>
+        <line x1="348" y1="370" x2="330" y2="385" strokeWidth="3"/>
+        <line x1="348" y1="370" x2="366" y2="385" strokeWidth="3"/>
+
+        {/* Remote on armrest */}
+        <rect x="28" y="412" width="28" height="52" rx="6" strokeWidth="2.5"/>
+        <circle cx="42" cy="425" r="5" strokeWidth="2"/>
+        <rect x="34" y="435" width="16" height="4" rx="1" strokeWidth="1.5"/>
+        <rect x="34" y="444" width="16" height="4" rx="1" strokeWidth="1.5"/>
+        <rect x="34" y="453" width="16" height="4" rx="1" strokeWidth="1.5"/>
+      </g>
+    </IllusWrap>
+  );
+}
+
+// D — Scattered: playful objects all over
+function IllusD({ ink, bg }) {
+  const items = [
+    // Film reels (circle + inner circle)
+    { type:'reel', cx:80,  cy:120, r:55 },
+    { type:'reel', cx:320, cy:380, r:42 },
+    { type:'reel', cx:195, cy:520, r:35 },
+    // Ticket stubs
+    { type:'ticket', x:220, y:80,  w:120, h:50, rot:-12 },
+    { type:'ticket', x:30,  y:320, w:100, h:42, rot:8   },
+    { type:'ticket', x:260, y:500, w:90,  h:38, rot:15  },
+    // Stars
+    { type:'star', cx:340, cy:140, r:18 },
+    { type:'star', cx:48,  cy:500, r:14 },
+    { type:'star', cx:170, cy:240, r:10 },
+    // Film frame
+    { type:'frame', x:240, y:260, w:110, h:76, rot:-8 },
+  ];
+
+  return (
+    <IllusWrap bg={bg}>
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {items.map((it, i) => {
+          if (it.type === 'reel') return (
+            <g key={i}>
+              <circle cx={it.cx} cy={it.cy} r={it.r} strokeWidth="4"/>
+              <circle cx={it.cx} cy={it.cy} r={it.r*0.32} strokeWidth="3"/>
+              <circle cx={it.cx} cy={it.cy} r={it.r*0.28} strokeWidth="0" fill={ink} opacity="0.1"/>
+              {[0,72,144,216,288].map((deg,j) => {
+                const rad=deg*Math.PI/180, pr=it.r*0.65;
+                return <circle key={j} cx={it.cx+pr*Math.cos(rad)} cy={it.cy+pr*Math.sin(rad)} r={it.r*0.14} strokeWidth="2.5"/>;
+              })}
+            </g>
+          );
+          if (it.type === 'ticket') return (
+            <g key={i} transform={`rotate(${it.rot} ${it.x+it.w/2} ${it.y+it.h/2})`}>
+              <rect x={it.x} y={it.y} width={it.w} height={it.h} rx="4" strokeWidth="3.5"/>
+              <line x1={it.x+it.w*0.35} y1={it.y} x2={it.x+it.w*0.35} y2={it.y+it.h} strokeWidth="2" strokeDasharray="4 4"/>
+              <circle cx={it.x} cy={it.y+it.h/2} r={it.h*0.28} strokeWidth="2.5" fill={bg}/>
+              <circle cx={it.x+it.w} cy={it.y+it.h/2} r={it.h*0.28} strokeWidth="2.5" fill={bg}/>
+            </g>
+          );
+          if (it.type === 'star') return (
+            <g key={i}>
+              <line x1={it.cx-it.r} y1={it.cy} x2={it.cx+it.r} y2={it.cy} strokeWidth="3"/>
+              <line x1={it.cx} y1={it.cy-it.r} x2={it.cx} y2={it.cy+it.r} strokeWidth="3"/>
+              <line x1={it.cx-it.r*0.7} y1={it.cy-it.r*0.7} x2={it.cx+it.r*0.7} y2={it.cy+it.r*0.7} strokeWidth="2.5"/>
+              <line x1={it.cx+it.r*0.7} y1={it.cy-it.r*0.7} x2={it.cx-it.r*0.7} y2={it.cy+it.r*0.7} strokeWidth="2.5"/>
+            </g>
+          );
+          if (it.type === 'frame') return (
+            <g key={i} transform={`rotate(${it.rot} ${it.x+it.w/2} ${it.y+it.h/2})`}>
+              <rect x={it.x} y={it.y} width={it.w} height={it.h} rx="3" strokeWidth="4"/>
+              <rect x={it.x+8} y={it.y+8} width={14} height={10} rx="1" strokeWidth="2"/>
+              <rect x={it.x+it.w-22} y={it.y+8} width={14} height={10} rx="1" strokeWidth="2"/>
+              <rect x={it.x+8} y={it.y+it.h-18} width={14} height={10} rx="1" strokeWidth="2"/>
+              <rect x={it.x+it.w-22} y={it.y+it.h-18} width={14} height={10} rx="1" strokeWidth="2"/>
+            </g>
+          );
+          return null;
+        })}
+        {/* Extra loose marks */}
+        <path d="M 155 160 Q 180 130 210 165" strokeWidth="5"/>
+        <path d="M 50 220 Q 70 195 100 225" strokeWidth="4"/>
+        <circle cx="330" cy="240" r="8" strokeWidth="0" fill={ink} opacity="0.25"/>
+        <circle cx="140" cy="450" r="6" strokeWidth="0" fill={ink} opacity="0.2"/>
+      </g>
+    </IllusWrap>
+  );
+}
+
+function LandingIllustration({ pal, illustration }) {
+  const ink = pal.ink;
+  const bg  = pal.bg;
+  const map = { a: IllusA, b: IllusB, c: IllusC, d: IllusD };
+  const Comp = map[illustration] || IllusA;
+  return <Comp ink={ink} bg={bg}/>;
+}
+
+// ── DUMMY (kept for compat — not used) ───────────────────────────────────────
+function _OldLandingIllustration({ pal }) {
+  const ink = pal.ink;
+  const bg  = pal.bg;
+  return (
+    <svg viewBox="0 0 390 620" preserveAspectRatio="xMidYMid slice"
+      style={{ position:'absolute', top:0, left:0, width:'100%', height:'72%', display:'block' }}
+      xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="hd" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="turbulence" baseFrequency="0.018" numOctaves="3" seed="5" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+        </filter>
+      </defs>
+
+      {/* Bg */}
+      <rect width="390" height="620" fill={bg}/>
+
+      {/* ── FILM REEL (main hero shape) ────────────────────────────── */}
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        {/* Outer ring */}
+        <circle cx="195" cy="290" r="188" strokeWidth="5"/>
+        {/* Inner hub ring */}
+        <circle cx="195" cy="290" r="62" strokeWidth="4.5"/>
+        {/* Hub fill */}
+        <circle cx="195" cy="290" r="58" strokeWidth="0" fill={ink} opacity="0.08"/>
+
+        {/* 6 reel holes — at 60° intervals, radius ~130 from center */}
+        {[0,60,120,180,240,300].map((deg,i) => {
+          const rad = deg * Math.PI / 180;
+          const x = 195 + 130 * Math.cos(rad);
+          const y = 290 + 130 * Math.sin(rad);
+          return <circle key={i} cx={x} cy={y} r="26" strokeWidth="3.5"/>;
+        })}
+
+        {/* Spoke lines connecting hub to holes */}
+        {[0,60,120,180,240,300].map((deg,i) => {
+          const rad = deg * Math.PI / 180;
+          const x1 = 195 + 64  * Math.cos(rad);
+          const y1 = 290 + 64  * Math.sin(rad);
+          const x2 = 195 + 104 * Math.cos(rad);
+          const y2 = 290 + 104 * Math.sin(rad);
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} strokeWidth="3.5"/>;
+        })}
+      </g>
+
+      {/* ── FILM STRIP band — top ─────────────────────────────────── */}
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeWidth="3">
+        <rect x="-4" y="8" width="400" height="52" rx="3"/>
+        <rect x="-4" y="8" width="400" height="52" rx="3" fill={ink} opacity="0.07"/>
+        {[0,1,2,3,4,5,6,7,8,9].map(i => (
+          <rect key={i} x={8 + i*40} y="16" width="18" height="36" rx="3" strokeWidth="2.5"/>
+        ))}
+      </g>
+
+      {/* ── FILM STRIP band — bottom ──────────────────────────────── */}
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeWidth="3">
+        <rect x="-4" y="562" width="400" height="52" rx="3"/>
+        <rect x="-4" y="562" width="400" height="52" rx="3" fill={ink} opacity="0.07"/>
+        {[0,1,2,3,4,5,6,7,8,9].map(i => (
+          <rect key={i} x={8 + i*40} y="570" width="18" height="36" rx="3" strokeWidth="2.5"/>
+        ))}
+      </g>
+
+      {/* ── CLAPPERBOARD — top right ─────────────────────────────── */}
+      <g filter="url(#hd)" stroke={ink} fill="none" strokeWidth="3.5" strokeLinecap="round">
+        {/* Board body */}
+        <rect x="290" y="100" width="88" height="68" rx="3"/>
+        {/* Clapper top bar */}
+        <rect x="290" y="88" width="88" height="18" rx="3" fill={ink} opacity="0.12"/>
+        {/* Diagonal stripes on clapper */}
+        <line x1="306" y1="88" x2="299" y2="106" strokeWidth="3"/>
+        <line x1="326" y1="88" x2="319" y2="106" strokeWidth="3"/>
+        <line x1="346" y1="88" x2="339" y2="106" strokeWidth="3"/>
+        <line x1="366" y1="88" x2="359" y2="106" strokeWidth="3"/>
+        {/* Hinge pin */}
+        <circle cx="290" cy="97" r="5" fill={ink} opacity="0.3"/>
+      </g>
+
+      {/* ── TWO ABSTRACT FIGURES watching ────────────────────────── */}
+      <g filter="url(#hd)" stroke={ink} fill={bg} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+        {/* Figure A — head + body blob */}
+        <ellipse cx="92" cy="490" rx="22" ry="22"/>
+        <path d="M68,514 C62,538 64,572 66,590 L118,590 C120,572 122,538 116,514 C110,507 98,504 92,504 C86,504 74,507 68,514Z"/>
+        {/* Figure B */}
+        <ellipse cx="148" cy="487" rx="22" ry="22"/>
+        <path d="M124,510 C118,534 120,568 122,590 L174,590 C176,568 178,534 172,510 C166,503 154,500 148,500 C142,500 130,503 124,510Z"/>
+        {/* Shared "watching" gesture — arm of B on shoulder of A */}
+        <path d="M124,530 Q108,520 96,525" strokeWidth="3" fill="none"/>
+      </g>
+
+      {/* ── SMALL SPARKLE marks ──────────────────────────────────── */}
+      <g stroke={ink} strokeWidth="2.8" strokeLinecap="round" fill="none">
+        {/* Star A */}
+        <line x1="46" y1="420" x2="46" y2="408"/>
+        <line x1="40" y1="414" x2="52" y2="414"/>
+        <line x1="42" y1="410" x2="50" y2="418"/>
+        <line x1="42" y1="418" x2="50" y2="410"/>
+        {/* Star B */}
+        <line x1="355" y1="200" x2="355" y2="188"/>
+        <line x1="349" y1="194" x2="361" y2="194"/>
+        <line x1="351" y1="190" x2="359" y2="198"/>
+        <line x1="351" y1="198" x2="359" y2="190"/>
+        {/* Dot accents */}
+        <circle cx="38"  cy="560" r="5" fill={ink} opacity="0.25"/>
+        <circle cx="362" cy="480" r="4" fill={ink} opacity="0.2"/>
+        <circle cx="270" cy="520" r="7" fill="none" strokeWidth="2.5"/>
+      </g>
+
+      {/* Bottom gradient fade — so text can sit on top legibly */}
+      <defs>
+        <linearGradient id="fade-down" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="55%" stopColor={bg} stopOpacity="0"/>
+          <stop offset="100%" stopColor="#0A0A0A" stopOpacity="1"/>
+        </linearGradient>
+      </defs>
+      <rect width="390" height="620" fill="url(#fade-down)"/>
+    </svg>
+  );
+}
+
+// ── LANDING SCREEN ────────────────────────────────────────────────────────────
+function LandingScreen({ onEnter, palette, bodyFont, logoFont, illustration }) {
+  const pal  = PALETTES[palette]  || PALETTES.cobalt;
+  const font = BODY_FONTS[bodyFont] || BODY_FONTS.a;
+  const logo = LOGO_FONTS[logoFont] || LOGO_FONTS.a;
+
+  // font-specific tweaks for display size + style
+  const isSerif  = bodyFont === 'c';
+  const btnStyle = isSerif
+    ? { fontFamily: font.family, fontSize:16, fontStyle:'italic', letterSpacing:'0.03em' }
+    : { fontFamily: font.family, fontSize:14, fontWeight:600, letterSpacing:'0.1em' };
+  const subStyle = isSerif
+    ? { fontFamily: font.family, fontSize:17, fontStyle:'italic', lineHeight:1.55 }
+    : { fontFamily: font.family, fontSize:15, fontWeight:400, lineHeight:1.7 };
+
+  return (
+    <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', overflow:'hidden', background:'#0A0A0A' }}>
+
+      {/* Illustrated background */}
+      <LandingIllustration pal={pal} illustration={illustration}/>
+
+      {/* Text content — bottom third */}
+      <div style={{
+        position:'relative', flex:1,
+        display:'flex', flexDirection:'column',
+        justifyContent:'flex-end', padding:'0 28px 48px',
+      }}>
+        {/* Logotype */}
+        <div className="fade-up" style={{ marginBottom:20 }}>
+          <div style={{
+            fontFamily: logo.family, fontStyle: logo.style, fontWeight: logo.weight,
+            fontSize: logo.size, color:pal.title, lineHeight:0.9, letterSpacing: logo.tracking,
+            textTransform: logo.transform,
+          }}>Reel</div>
+          <div style={{
+            fontFamily:"'JetBrains Mono',monospace", fontSize:10,
+            color:pal.label, letterSpacing:'0.22em', marginTop:14,
+          }}>A FILM CLUB WITH FRIENDS</div>
+        </div>
+
+        <p className="fade-up" style={{
+          ...subStyle,
+          color: pal.sub, maxWidth:300, marginBottom:36,
+          textWrap:'pretty', animationDelay:'0.08s',
+        }}>
+          Stop spending hours finding something to watch. Pick vibes, swipe curated options and match on films you all like. Tonight is sorted.
+        </p>
+
+        <button className="fade-up" onClick={onEnter} style={{
+          ...btnStyle,
+          height:54, borderRadius:3, border:'none',
+          background: pal.ctaBg, color: pal.ctaText,
+          cursor:'pointer', marginBottom:10,
+          animationDelay:'0.14s',
+        }}>Log in</button>
+
+        <button className="fade-up" onClick={onEnter} style={{
+          ...btnStyle,
+          height:44, borderRadius:3,
+          background:'transparent', border:`1px solid ${pal.label}`,
+          color: pal.label,
+          cursor:'pointer', marginBottom:0,
+          animationDelay:'0.18s',
+          fontSize: 12, fontWeight:400, letterSpacing:'0.08em',
+        }}>Create an account</button>
+      </div>
+    </div>
+  );
+}
+
+// ── LIVE ROOM SCREEN ──────────────────────────────────────────────────────────
+function LiveRoomScreen({ tmdbKey }) {
+  const [youSwipe,      setYouSwipe]      = useState(null);
+  const [partnerSwipe,  setPartnerSwipe]  = useState(null);
+  const [matchVisible,  setMatchVisible]  = useState(false);
+  const [details,       setDetails]       = useState(false);
+  const film = FILMS[3]; // In the Mood for Love
+
+  const swipe = (dir) => {
+    if (youSwipe) return;
+    setYouSwipe(dir);
+    setTimeout(() => {
+      setPartnerSwipe('like');
+      if (dir === 'like') setTimeout(() => setMatchVisible(true), 500);
+      else setTimeout(() => { setYouSwipe(null); setPartnerSwipe(null); }, 1200);
+    }, 1100);
+  };
+
+  return (
+    <div style={{ position:'absolute', inset:0, background:'#0A0A0A', display:'flex', flexDirection:'column' }}>
+      {/* Header */}
+      <div style={{ padding:'48px 24px 16px', borderBottom:'1px solid #161616' }}>
+        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.22em', marginBottom:7 }}>LIVE ROOM</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)', fontSize:30, color:'#F5F1EA', letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)' }}>
+            Watch Night
+          </div>
+          <div style={{
+            fontFamily:"'JetBrains Mono',monospace", fontSize:11,
+            color:'#8B2A2A', border:'1px solid #8B2A2A44',
+            padding:'4px 11px', borderRadius:2, letterSpacing:'0.14em',
+          }}>DUNE-42X</div>
+        </div>
+      </div>
+
+      {/* Participants */}
+      <div style={{ display:'flex', gap:10, padding:'16px 24px 0' }}>
+        {[
+          { label:'You',  color:'#C9A961', swipe: youSwipe     },
+          { label:'Alex', color:'#7090b0', swipe: partnerSwipe },
+        ].map(p => (
+          <div key={p.label} style={{
+            flex:1, padding:'13px 15px', background:'#0e0e0e',
+            border:`1px solid ${p.color}1a`, borderRadius:4,
+            display:'flex', alignItems:'center', gap:10,
+          }}>
+            <div style={{
+              width:32, height:32, borderRadius:'50%', flexShrink:0,
+              background:`radial-gradient(circle, ${p.color}35, ${p.color}10)`,
+              border:`1px solid ${p.color}35`,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)',
+              fontSize:14, color:p.color, letterSpacing:'var(--font-display-tracking)',
+            }}>{p.label[0]}</div>
+            <div>
+              <div style={{ fontFamily:'var(--font-body)', fontSize:13, color:'#E0DCD8', fontWeight:500 }}>{p.label}</div>
+              <div style={{
+                fontFamily:"'JetBrains Mono',monospace", fontSize:9,
+                color: p.swipe ? (p.swipe==='like' ? '#C9A961' : '#4a4a4a') : '#2a2a2a',
+                letterSpacing:'0.08em', marginTop:1, transition:'color 0.3s',
+              }}>
+                {p.swipe ? (p.swipe==='like' ? '♥ liked' : '✕ passed') : '── waiting'}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Full film card */}
+      <div style={{ flex:1, padding:'10px 14px 0', minHeight:0, position:'relative' }}>
+        <div style={{ height:'100%', borderRadius:4, overflow:'hidden', position:'relative', background:'#0c0c0c', boxShadow:'0 16px 40px rgba(0,0,0,0.6)' }}>
+          {/* Poster */}
+          <div style={{ position:'absolute', inset:'0 0 118px', overflow:'hidden' }}>
+            <FilmPoster film={film} tmdbKey={tmdbKey}/>
+          </div>
+          {/* Info panel */}
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, height:118, background:'#0A0A0A', borderTop:'1px solid #181818', padding:'14px 18px 16px', zIndex:5 }}>
+            <div style={{ fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)', fontSize:22, color:'#F5F1EA', lineHeight:1.05, letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)', marginBottom:5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{film.title}</div>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#5A5550', letterSpacing:'0.07em' }}>{film.director}</div>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#3a3a3a', letterSpacing:'0.07em', marginTop:3 }}>{film.country} · {film.year}</div>
+          </div>
+          {/* Detail panel */}
+          <div style={{
+            position:'absolute', left:0, right:0,
+            bottom: details ? 0 : -560, height:560,
+            backdropFilter:'blur(24px) brightness(0.7)',
+            backgroundColor:'rgba(8,8,8,0.95)',
+            transition:'bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)',
+            padding:'50px 20px 24px', cursor:'default', zIndex:10,
+            overflowY:'auto',
+          }}
+            onMouseDown={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+          >
+            <p style={{ fontFamily:'var(--font-body)', fontSize:14, color:'#9A9590', lineHeight:1.7, textWrap:'pretty', marginBottom:18 }}>{film.plot}</p>
+            <div style={{ display:'flex', gap:20, marginBottom:16 }}>
+              {[['IMDb RATING', film.imdbRating],['ROTTEN TOMATOES', film.rt+'%']].map(([k,v]) => (
+                <div key={k}>
+                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.12em', marginBottom:3 }}>{k}</div>
+                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:20, color:film.accent }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:16, marginBottom:14 }}>
+              {[['RUNTIME', film.runtime+' min'],['LANGUAGE', film.language]].map(([k,v]) => (
+                <div key={k}>
+                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.1em', marginBottom:2 }}>{k}</div>
+                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:13, color:'#8A8580' }}>{v}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:16 }}>
+              {film.genres.map(g => (
+                <span key={g} style={{ fontFamily:'var(--font-body)', fontSize:10, color:'#4a4a4a', border:'1px solid #222', borderRadius:2, padding:'2px 8px', letterSpacing:'0.05em', textTransform:'uppercase' }}>{g}</span>
+              ))}
+            </div>
+            {film.awards && (
+              <div>
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.12em', marginBottom:6 }}>AWARDS & RECOGNITION</div>
+                <p style={{ fontFamily:'var(--font-body)', fontSize:13, color:'#6a6560', lineHeight:1.6, textWrap:'pretty' }}>{film.awards}</p>
+              </div>
+            )}
+          </div>
+          {/* MORE toggle */}
+          <button onClick={() => setDetails(d=>!d)} style={{
+            position:'absolute', bottom: details ? 500 : 120, left:'50%', transform:'translateX(-50%)',
+            background:'transparent', border:'none', color:'#3a3535', cursor:'pointer',
+            fontFamily:"'JetBrains Mono',monospace", fontSize:9, letterSpacing:'0.14em', padding:'10px 16px',
+            transition:'bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)', zIndex:15,
+          }}>{details ? '▲  LESS' : '▼  MORE'}</button>
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display:'flex', gap:10, padding:'14px 24px 24px' }}>
+        {[['Pass','pass','#6a6060','#111','#222'],['Like ♥','like','#C9A961','#14100a','#C9A96145']].map(([label,dir,color,bg,border]) => (
+          <button key={dir} onClick={() => swipe(dir)} style={{
+            flex:1, height:50, borderRadius:3,
+            background: youSwipe===dir ? bg : 'transparent',
+            border:`1px solid ${youSwipe===dir ? border : '#222'}`,
+            color: youSwipe===dir ? color : '#4a4a4a',
+            fontFamily:'var(--font-body)', fontSize:13,
+            cursor: youSwipe ? 'default' : 'pointer',
+            opacity: youSwipe && youSwipe!==dir ? 0.3 : 1,
+            transition:'all 0.2s ease',
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* Match overlay */}
+      {matchVisible && (
+        <div className="match-in" style={{
+          position:'absolute', inset:0,
+          background:'rgba(4,4,4,0.95)', backdropFilter:'blur(10px)',
+          display:'flex', flexDirection:'column',
+          alignItems:'center', justifyContent:'center',
+          padding:'40px 28px', gap:18,
+        }}>
+          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:film.accent, letterSpacing:'0.28em' }}>── A MATCH ──</div>
+          <div style={{
+            width:188, height:264, borderRadius:4, overflow:'hidden',
+            background:film.bg, flexShrink:0,
+            boxShadow:'0 24px 60px rgba(0,0,0,0.7)',
+          }}>
+            <div style={{ width:'100%', height:'100%', background:'radial-gradient(ellipse at 50% 30%, transparent 28%, rgba(0,0,0,0.5) 100%)' }}/>
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontFamily:'var(--font-body)', fontStyle:'normal', fontWeight:300, fontSize:13, color:'#5a5550', marginBottom:8 }}>
+              You both want to watch
+            </div>
+            <div style={{ fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)', fontSize:32, color:'#F5F1EA', lineHeight:1.05 }}>
+              {film.title}
+            </div>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#4a4a4a', marginTop:6 }}>
+              {film.year} · {film.director}
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:10, width:'100%', marginTop:4 }}>
+            <button onClick={() => { setMatchVisible(false); setYouSwipe(null); setPartnerSwipe(null); }} style={{
+              flex:1, height:48, borderRadius:3,
+              background:'transparent', border:'1px solid #252525',
+              color:'#6a6560', fontFamily:'var(--font-body)',
+              fontSize:13, cursor:'pointer',
+            }}>Keep swiping</button>
+            <button style={{
+              flex:1, height:48, borderRadius:3,
+              background:'#8B2A2A', border:'none',
+              color:'#F5F1EA', fontFamily:'var(--font-body)',
+              fontSize:13, fontWeight:500, cursor:'pointer',
+            }}>Watch it →</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── LISTS SCREEN ──────────────────────────────────────────────────────────────
+function ListsScreen({ liked, tmdbKey }) {
+  const [tab, setTab] = useState('liked');
+  const display = liked.length ? liked : FILMS.slice(0,4);
+
+  return (
+    <div style={{ position:'absolute', inset:0, background:'#0A0A0A', display:'flex', flexDirection:'column' }}>
+      <div style={{ padding:'48px 24px 0' }}>
+        <div style={{ fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)', fontSize:32, color:'#F5F1EA', letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)', marginBottom:22 }}>
+          Your queue
+        </div>
+        <div style={{ display:'flex', borderBottom:'1px solid #181818', marginBottom:0 }}>
+          {['Liked','Matches','Watched'].map(t => {
+            const active = tab === t.toLowerCase();
+            return (
+              <button key={t} onClick={() => setTab(t.toLowerCase())} style={{
+                flex:1, height:40, background:'transparent', border:'none',
+                borderBottom: active ? '1px solid #F5F1EA' : '1px solid transparent',
+                color: active ? '#F5F1EA' : '#3a3a3a',
+                fontFamily:'var(--font-body)', fontSize:12,
+                fontWeight: active ? 500 : 400, cursor:'pointer',
+                letterSpacing:'0.04em', marginBottom:-1, transition:'all 0.15s',
+              }}>{t}</button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', padding:'4px 24px 80px' }}>
+        {tab === 'liked' && display.map(film => (
+          <div key={film.id} style={{
+            display:'flex', gap:14, alignItems:'center',
+            padding:'13px 0', borderBottom:'1px solid #121212',
+          }}>
+            <div style={{ width:42, height:58, borderRadius:2, flexShrink:0, overflow:'hidden', position:'relative' }}>
+              <FilmPoster film={film} tmdbKey={tmdbKey}/>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontFamily:'var(--font-display)', fontStyle:'normal', fontWeight:'var(--font-display-weight)', fontSize:16, color:'#F5F1EA', letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{film.title}</div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#3a3a3a', marginTop:3, letterSpacing:'0.06em' }}>{film.year} · {film.director}</div>
+            </div>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:16, color:film.accent }}>{film.imdbRating}</div>
+          </div>
+        ))}
+
+        {(tab === 'matches' || tab === 'watched') && (
+          <div style={{ padding:'60px 0', display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
+            <div style={{ fontFamily:'var(--font-body)', fontStyle:'normal', fontSize:18, color:'#2a2a2a' }}>
+              {tab === 'matches' ? 'No matches yet' : 'Nothing watched yet'}
+            </div>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#1e1e1e', letterSpacing:'0.1em' }}>
+              {tab === 'matches' ? 'Invite a friend to start' : 'Mark films as watched'}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── PROFILE SCREEN ────────────────────────────────────────────────────────────
+const DEMO_FRIENDS = [
+  { id:1, name:'Alex',   handle:'@alex_reel',  matches:7,  avatar:'A', color:'#7090b0', online:true  },
+  { id:2, name:'Priya',  handle:'@priyafilm',  matches:3,  avatar:'P', color:'#b07090', online:false },
+  { id:3, name:'Marcus', handle:'@marc_watch', matches:12, avatar:'M', color:'#70b090', online:true  },
+];
+const DEMO_REQUESTS = [
+  { id:4, name:'Jordan', handle:'@jord_cinema', avatar:'J', color:'#b09070' },
+];
+
+function ProfileScreen() {
+  const [view,    setView]    = useState('main'); // main | friends | add
+  const [search,  setSearch]  = useState('');
+  const [friends, setFriends] = useState(DEMO_FRIENDS);
+  const [requests]            = useState(DEMO_REQUESTS);
+
+  const Avatar = ({ label, color, size=44 }) => (
+    <div style={{
+      width:size, height:size, borderRadius:'50%', flexShrink:0,
+      background:`radial-gradient(circle, ${color}40, ${color}15)`,
+      border:`1px solid ${color}50`,
+      display:'flex', alignItems:'center', justifyContent:'center',
+      fontFamily:'var(--font-display)', fontSize:size*0.38,
+      fontWeight:'bold', color, letterSpacing:0,
+      textTransform:'uppercase',
+    }}>{label}</div>
+  );
+
+  return (
+    <div style={{ position:'absolute', inset:0, background:'#0A0A0A', display:'flex', flexDirection:'column' }}>
+      {/* Header */}
+      <div style={{ padding:'48px 24px 20px', borderBottom:'1px solid #141414' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:20 }}>
+          <Avatar label="Y" color="#C9A961" size={56}/>
+          <div>
+            <div style={{ fontFamily:'var(--font-display)', fontWeight:'var(--font-display-weight)', fontSize:24, color:'#F5F1EA', letterSpacing:'var(--font-display-tracking)', textTransform:'var(--font-display-transform)' }}>Your Account</div>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:'#5a5550', marginTop:3 }}>@yourhandle</div>
+          </div>
+          <button style={{
+            marginLeft:'auto', height:34, padding:'0 14px', borderRadius:2,
+            background:'transparent', border:'1px solid #252525',
+            color:'#5a5550', fontFamily:'var(--font-body)', fontSize:12,
+            cursor:'pointer', letterSpacing:'0.04em',
+          }}>Edit</button>
+        </div>
+
+        {/* Stats row */}
+        <div style={{ display:'flex', gap:0 }}>
+          {[['28', 'Liked'], ['3', 'Friends'], ['22', 'Matches']].map(([n, l]) => (
+            <div key={l} style={{ flex:1, textAlign:'center', padding:'10px 0', borderRight:'1px solid #181818' }}>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:20, color:'#F5F1EA' }}>{n}</div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.1em', marginTop:3 }}>{l.toUpperCase()}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Friends section */}
+      <div style={{ flex:1, overflowY:'auto', padding:'0 0 80px' }}>
+        {/* Add friend row */}
+        <div style={{ padding:'16px 24px', borderBottom:'1px solid #141414' }}>
+          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.14em', marginBottom:10 }}>FIND FRIENDS</div>
+          <div style={{ display:'flex', gap:8 }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by username…"
+              style={{
+                flex:1, background:'#0e0e0e', border:'1px solid #252525',
+                borderRadius:2, padding:'9px 12px', color:'#F5F1EA',
+                fontFamily:"'JetBrains Mono',monospace", fontSize:11, outline:'none',
+              }}
+            />
+            <button style={{
+              height:38, padding:'0 16px', borderRadius:2,
+              background:'#8B2A2A', border:'none',
+              color:'#F5F1EA', fontFamily:'var(--font-body)',
+              fontSize:13, cursor:'pointer',
+            }}>Add</button>
+          </div>
+        </div>
+
+        {/* Pending requests */}
+        {requests.length > 0 && (
+          <div style={{ padding:'16px 24px 8px', borderBottom:'1px solid #141414' }}>
+            <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#C9A961', letterSpacing:'0.14em', marginBottom:12 }}>PENDING — {requests.length}</div>
+            {requests.map(r => (
+              <div key={r.id} style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                <Avatar label={r.avatar} color={r.color} size={40}/>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontFamily:'var(--font-body)', fontSize:14, color:'#E0DCD8', fontWeight:500 }}>{r.name}</div>
+                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#3a3a3a', marginTop:2 }}>{r.handle}</div>
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button style={{ height:30, padding:'0 12px', borderRadius:2, background:'#1a1008', border:'1px solid #C9A96145', color:'#C9A961', fontFamily:'var(--font-body)', fontSize:11, cursor:'pointer' }}>Accept</button>
+                  <button style={{ height:30, padding:'0 10px', borderRadius:2, background:'transparent', border:'1px solid #222', color:'#4a4a4a', fontFamily:'var(--font-body)', fontSize:11, cursor:'pointer' }}>Decline</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Friends list */}
+        <div style={{ padding:'16px 24px 8px' }}>
+          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.14em', marginBottom:12 }}>FRIENDS — {friends.length}</div>
+          {friends.map(f => (
+            <div key={f.id} style={{
+              display:'flex', alignItems:'center', gap:12,
+              padding:'12px 0', borderBottom:'1px solid #111',
+            }}>
+              <div style={{ position:'relative' }}>
+                <Avatar label={f.avatar} color={f.color} size={42}/>
+                {f.online && (
+                  <div style={{
+                    position:'absolute', bottom:1, right:1,
+                    width:9, height:9, borderRadius:'50%',
+                    background:'#50b870', border:'1.5px solid #0A0A0A',
+                  }}/>
+                )}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontFamily:'var(--font-body)', fontSize:14, color:'#E0DCD8', fontWeight:500 }}>{f.name}</div>
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#3a3a3a', marginTop:2, letterSpacing:'0.06em' }}>{f.handle}</div>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:'#C9A961', letterSpacing:'0.06em' }}>
+                  {f.matches} match{f.matches !== 1 ? 'es' : ''}
+                </div>
+                <button style={{
+                  height:26, padding:'0 10px', borderRadius:2,
+                  background:'transparent', border:`1px solid ${f.color}40`,
+                  color:f.color, fontFamily:'var(--font-body)',
+                  fontSize:10, cursor:'pointer', whiteSpace:'nowrap',
+                }}>Watch together →</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── BOTTOM NAV ────────────────────────────────────────────────────────────────
+function BottomNav({ screen, onChange }) {
+  const items = [
+    { id:'swipe',   glyph:'◈', label:'Swipe'   },
+    { id:'room',    glyph:'⊕', label:'Room'    },
+    { id:'lists',   glyph:'≡', label:'Lists'   },
+    { id:'profile', glyph:'profile', label:'Profile' },
+  ];
+  return (
+    <div style={{
+      position:'absolute', bottom:0, left:0, right:0, height:70,
+      background:'#0A0A0A', borderTop:'1px solid #161616',
+      display:'flex', alignItems:'center', justifyContent:'space-around',
+      paddingBottom:6, zIndex:100,
+    }}>
+      {items.map(it => {
+        const active = screen === it.id;
+        return (
+          <button key={it.id} onClick={() => onChange(it.id)} style={{
+            background:'transparent', border:'none',
+            display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+            cursor:'pointer', opacity: active ? 1 : 0.3, transition:'opacity 0.15s',
+          }}>
+            {it.id === 'profile' ? (
+              <svg width="21" height="21" viewBox="0 0 21 21" fill="none" stroke={active ? '#F5F1EA' : '#8A8580'} strokeWidth="1.6" strokeLinecap="round">
+                <circle cx="10.5" cy="7" r="3.5"/>
+                <path d="M3 19c0-4.142 3.358-7.5 7.5-7.5S18 14.858 18 19"/>
+              </svg>
+            ) : (
+              <span style={{ fontSize:21, color:active ? '#F5F1EA' : '#8A8580' }}>{it.glyph}</span>
+            )}
+            <span style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:8, color: active ? '#6a6560' : '#2a2a2a', letterSpacing:'0.14em' }}>
+              {it.label.toUpperCase()}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── TWEAKS ────────────────────────────────────────────────────────────────────
+function TweaksPanel({ tweaks, onChange }) {
+  const [pos, setPos] = useState({ x: null, y: null });
+  const [dragging, setDragging] = useState(false);
+  const startRef = useRef(null);
+  const panelRef = useRef(null);
+
+  // Default position bottom-right
+  const left = pos.x !== null ? pos.x : undefined;
+  const bottom = pos.x !== null ? undefined : 80;
+  const top = pos.y !== null ? pos.y : undefined;
+  const right = pos.x !== null ? undefined : 14;
+
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e) => {
+      const cx = e.clientX ?? e.touches?.[0]?.clientX;
+      const cy = e.clientY ?? e.touches?.[0]?.clientY;
+      if (cx == null) return;
+      const pw = panelRef.current?.offsetWidth  || 258;
+      const ph = panelRef.current?.offsetHeight || 300;
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth  - pw, cx - startRef.current.dx)),
+        y: Math.max(0, Math.min(window.innerHeight - ph, cy - startRef.current.dy)),
+      });
+    };
+    const up = () => setDragging(false);
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+    document.addEventListener('touchmove', move, { passive:true });
+    document.addEventListener('touchend', up);
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.removeEventListener('touchmove', move);
+      document.removeEventListener('touchend', up);
+    };
+  }, [dragging]);
+
+  const onDragStart = (e) => {
+    const cx = e.clientX ?? e.touches?.[0]?.clientX;
+    const cy = e.clientY ?? e.touches?.[0]?.clientY;
+    const rect = panelRef.current?.getBoundingClientRect();
+    startRef.current = { dx: cx - (rect?.left || 0), dy: cy - (rect?.top || 0) };
+    if (pos.x === null) {
+      // Initialise position from current rendered rect
+      setPos({ x: rect?.left || 100, y: rect?.top || 100 });
+    }
+    setDragging(true);
+  };
+
+  return (
+    <div ref={panelRef} style={{
+      position:'absolute', zIndex:600,
+      left, right, top, bottom,
+      width:258, background:'#101010', border:'1px solid #222',
+      borderRadius:4, boxShadow:'0 16px 48px rgba(0,0,0,0.8)',
+      userSelect:'none',
+    }}>
+      {/* Drag handle */}
+      <div
+        onMouseDown={onDragStart}
+        onTouchStart={onDragStart}
+        style={{
+          padding:'12px 20px 6px', cursor:'grab',
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          borderBottom:'1px solid #1a1a1a', marginBottom:12,
+        }}>
+        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'#3a3a3a', letterSpacing:'0.18em' }}>TWEAKS</div>
+        <div style={{ display:'flex', gap:3 }}>
+          {[0,1,2].map(i => <div key={i} style={{ width:16, height:2, background:'#2a2a2a', borderRadius:1 }}/>)}
+        </div>
+      </div>
+
+      <div style={{ padding:'0 20px 20px' }}>
+      <Label>TMDB API Key</Label>
+      <input value={tweaks.tmdbKey}
+        onChange={e => onChange({ ...tweaks, tmdbKey: e.target.value })}
+        placeholder="TMDB API key"
+        style={{
+          width:'100%', background:'#0A0A0A', border:'1px solid #252525',
+          borderRadius:2, padding:'8px 10px', color:'#F5F1EA',
+          fontFamily:"'JetBrains Mono',monospace", fontSize:11, outline:'none',
+          marginBottom:16,
+        }}
+      />
+
+      <Label>Match chance: {tweaks.matchChance}%</Label>
+      <input type="range" min={0} max={100} value={tweaks.matchChance}
+        onChange={e => onChange({ ...tweaks, matchChance: +e.target.value })}
+        style={{ marginBottom:16 }}
+      />
+
+      <Label>Landing palette</Label>
+      <div style={{ display:'flex', gap:8, marginTop:4, marginBottom:16 }}>
+        {Object.entries({ cobalt:'#1e3db0', coral:'#E8453C', gold:'#F0A820' }).map(([k,c]) => (
+          <button key={k} onClick={() => onChange({ ...tweaks, landingPalette: k })} style={{
+            flex:1, height:28, borderRadius:2, background:c, border:'none',
+            cursor:'pointer', outline: tweaks.landingPalette===k ? '2px solid #F5F1EA' : '2px solid transparent',
+            outlineOffset:2,
+            fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:'rgba(255,255,255,0.7)',
+            letterSpacing:'0.08em',
+          }}>{k}</button>
+        ))}
+      </div>
+
+      <Label>Illustration</Label>
+      <div style={{ display:'flex', gap:6, marginTop:4, marginBottom:16 }}>
+        {Object.entries(ILLUS_LABELS).map(([k, label]) => (
+          <button key={k} onClick={() => onChange({ ...tweaks, illustration: k })} style={{
+            flex:1, height:32, borderRadius:2,
+            border:`1px solid ${tweaks.illustration===k ? '#F5F1EA' : '#252525'}`,
+            background: tweaks.illustration===k ? '#1e1e1e' : 'transparent',
+            color: tweaks.illustration===k ? '#F5F1EA' : '#5a5a5a',
+            fontFamily:"'JetBrains Mono',monospace", fontSize:8,
+            letterSpacing:'0.06em', cursor:'pointer',
+            textTransform:'uppercase', lineHeight:1.2, padding:'0 4px',
+          }}>{label}</button>
+        ))}
+      </div>
+
+      <Label>Logo font</Label>
+      <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:4, marginBottom:16 }}>
+        {Object.entries(LOGO_FONTS).map(([k, f]) => (
+          <button key={k} onClick={() => onChange({ ...tweaks, logoFont: k })} style={{
+            height:40, borderRadius:2, border:`1px solid ${tweaks.logoFont===k ? '#F5F1EA' : '#252525'}`,
+            background: tweaks.logoFont===k ? '#1e1e1e' : 'transparent',
+            color: tweaks.logoFont===k ? '#F5F1EA' : '#5a5a5a',
+            fontFamily: f.family, fontSize: Math.min(f.size * 0.22, 18),
+            fontWeight: f.weight, fontStyle: f.style,
+            textTransform: f.transform,
+            cursor:'pointer', letterSpacing: f.tracking,
+          }}>{f.label}</button>
+        ))}
+      </div>
+
+      <Label>Body font</Label>
+      <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:4 }}>
+        {Object.entries(BODY_FONTS).map(([k, f]) => (
+          <button key={k} onClick={() => onChange({ ...tweaks, bodyFont: k })} style={{
+            height:34, borderRadius:2, border:`1px solid ${tweaks.bodyFont===k ? '#F5F1EA' : '#252525'}`,
+            background: tweaks.bodyFont===k ? '#1e1e1e' : 'transparent',
+            color: tweaks.bodyFont===k ? '#F5F1EA' : '#5a5a5a',
+            fontFamily: f.family, fontSize:13,
+            cursor:'pointer',
+          }}>{f.label}</button>
+        ))}
+      </div>
+      </div>
+    </div>
+  );
+}
+
+function Label({ children }) {
+  return <div style={{ fontFamily:'var(--font-body)', fontSize:11, color:'#6a6560', marginBottom:6 }}>{children}</div>;
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [screen, setScreen]     = useState('landing');
+  const [moods,  setMoods]      = useState(null);
+  const [match,  setMatch]      = useState(null);
+  const [liked,  setLiked]      = useState([]);
+  const [tweaks, setTweaks]     = useState(TWEAK_DEFAULTS);
+  const [showTweaks, setShowTweaks] = useState(false);
+
+  useEffect(() => {
+    window.addEventListener('message', e => {
+      if (e.data?.type === '__activate_edit_mode')   setShowTweaks(true);
+      if (e.data?.type === '__deactivate_edit_mode') setShowTweaks(false);
+    });
+    window.parent.postMessage({ type:'__edit_mode_available' }, '*');
+  }, []);
+
+
+  // Sync font CSS vars with tweaks
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+    const lf = LOGO_FONTS[tweaks.logoFont] || LOGO_FONTS.d;
+    const bf = BODY_FONTS[tweaks.bodyFont] || BODY_FONTS.a;
+    root.style.setProperty('--font-display', lf.family);
+    root.style.setProperty('--font-display-weight', String(lf.weight));
+    root.style.setProperty('--font-display-tracking', lf.tracking || '0em');
+    root.style.setProperty('--font-display-transform', lf.transform || 'none');
+    root.style.setProperty('--font-body', bf.family);
+  }, [tweaks.logoFont, tweaks.bodyFont]);
+  const onTweakChange = (t) => {
+    setTweaks(t);
+    window.parent.postMessage({ type:'__edit_mode_set_keys', edits:t }, '*');
+  };
+
+  const onMatch = (film) => {
+    setMatch(film);
+    setLiked(l => [...l, film]);
+  };
+
+  if (screen === 'landing') return (
+    <>
+      <GrainOverlay/>
+      <LandingScreen onEnter={() => setScreen('moods')} palette={tweaks.landingPalette} bodyFont={tweaks.bodyFont} logoFont={tweaks.logoFont} illustration={tweaks.illustration}/>
+      {showTweaks && <TweaksPanel tweaks={tweaks} onChange={onTweakChange}/>}
+    </>
+  );
+
+  if (screen === 'moods') return (
+    <>
+      <GrainOverlay/>
+      <MoodSelector onConfirm={m => { setMoods(m); setScreen('swipe'); }}/>
+    </>
+  );
+
+  return (
+    <>
+      <GrainOverlay/>
+
+      {screen === 'swipe' && (
+        <div className="fade-in" style={{ position:'absolute', inset:'0 0 70px', display:'flex', flexDirection:'column' }}>
+          {/* Mood bar */}
+          <MoodBar moods={moods} onChange={setMoods}/>
+          <SwipeDeck onMatch={onMatch} tmdbKey={tweaks.tmdbKey} matchChance={tweaks.matchChance}/>
+        </div>
+      )}
+
+      {screen === 'room' && (
+        <div className="fade-in" style={{ position:'absolute', inset:'0 0 70px' }}>
+          <LiveRoomScreen tmdbKey={tweaks.tmdbKey}/>
+        </div>
+      )}
+
+      {screen === 'lists' && (
+        <div className="fade-in" style={{ position:'absolute', inset:'0 0 70px' }}>
+          <ListsScreen liked={liked} tmdbKey={tweaks.tmdbKey}/>
+        </div>
+      )}
+
+      {screen === 'profile' && (
+        <div className="fade-in" style={{ position:'absolute', inset:'0 0 70px' }}>
+          <ProfileScreen/>
+        </div>
+      )}
+
+      <BottomNav screen={screen} onChange={setScreen}/>
+
+      {match && (
+        <MatchToast film={match}
+          onDismiss={() => setMatch(null)}
+          onWatch={() => { window.open(`https://www.justwatch.com/us/search?q=${encodeURIComponent(match.title)}`,'_blank'); setMatch(null); }}
+        />
+      )}
+
+      {showTweaks && <TweaksPanel tweaks={tweaks} onChange={onTweakChange}/>}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

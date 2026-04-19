@@ -281,26 +281,24 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
         }}>
           <div style={{
             fontFamily: "var(--font-display)",
-            fontSize: 24, color: "#F5F1EA", lineHeight: 1.05,
+            fontSize: 28, color: "#F5F1EA", lineHeight: 1.05,
             letterSpacing: "0em", whiteSpace: "nowrap",
             overflow: "hidden", textOverflow: "ellipsis",
-            textTransform: "uppercase", marginBottom: 5,
+            textTransform: "uppercase", marginBottom: 6,
           }}>
             {film.title}
           </div>
           <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 10,
+            fontFamily: "var(--font-mono)", fontSize: 12,
             color: "#5A5550", letterSpacing: "0.07em",
           }}>
-            {film.director}
+            {film.director !== "Unknown" ? film.director : ""}
           </div>
           <div style={{
-            fontFamily: "var(--font-mono)", fontSize: 10,
+            fontFamily: "var(--font-mono)", fontSize: 11,
             color: "#3a3a3a", letterSpacing: "0.07em", marginTop: 3,
           }}>
-            {film.country ?? ""}
-            {film.country ? " · " : ""}
-            {film.year}
+            {film.country ? `${film.country} · ` : ""}{film.year}
           </div>
         </div>
 
@@ -321,52 +319,56 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
           onTouchStart={e => e.stopPropagation()}
         >
           <p style={{
-            fontFamily: "var(--font-sans)", fontSize: 14,
+            fontFamily: "var(--font-sans)", fontSize: 15,
             color: "#9A9590", lineHeight: 1.7, marginBottom: 20,
           }}>
             {film.plot}
           </p>
 
           {/* Ratings */}
-          <div style={{ display: "flex", gap: 20, marginBottom: 18 }}>
-            <div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>TMDB</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: visual.accent }}>{film.tmdbRating.toFixed(1)}</div>
-            </div>
+          <div style={{ display: "flex", gap: 24, marginBottom: 18 }}>
+            {film.tmdbRating > 0 && (
+              <div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>TMDB RATING</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{film.tmdbRating.toFixed(1)}</div>
+              </div>
+            )}
             {film.rtScore != null && (
               <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>ROTTEN TOMATOES</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 22, color: visual.accent }}>{film.rtScore}%</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>ROTTEN TOMATOES</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{film.rtScore}%</div>
               </div>
             )}
           </div>
 
           {/* Meta */}
-          <div style={{ display: "flex", gap: 16, marginBottom: 14, flexWrap: "wrap" }}>
-            {[["RUNTIME", `${film.runtime} min`], ["LANGUAGE", film.language ?? ""]].filter(([,v]) => v).map(([k, v]) => (
+          <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>
+            {[["RUNTIME", film.runtime ? `${film.runtime} min` : ""], ["LANGUAGE", film.language ?? ""]].filter(([,v]) => v).map(([k, v]) => (
               <div key={k}>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#3a3a3a", letterSpacing: "0.1em", marginBottom: 2 }}>{k}</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#8A8580" }}>{v}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.1em", marginBottom: 3 }}>{k}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "#8A8580" }}>{v}</div>
               </div>
             ))}
           </div>
 
           {/* Genre chips */}
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-            {film.genres.map(g => (
-              <span key={g} style={{
-                fontFamily: "var(--font-sans)", fontSize: 10, color: "#4a4a4a",
-                border: "1px solid #222", borderRadius: 2, padding: "2px 8px",
-                letterSpacing: "0.05em", textTransform: "uppercase",
-              }}>{g}</span>
-            ))}
-          </div>
+          {film.genres.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
+              {film.genres.map(g => (
+                <span key={g} style={{
+                  fontFamily: "var(--font-sans)", fontSize: 11, color: "#4a4a4a",
+                  border: "1px solid #222", borderRadius: 2, padding: "3px 10px",
+                  letterSpacing: "0.05em", textTransform: "uppercase",
+                }}>{g}</span>
+              ))}
+            </div>
+          )}
 
           {/* Awards */}
           {film.awards && (
             <div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 6 }}>AWARDS & RECOGNITION</div>
-              <p style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "#6a6560", lineHeight: 1.6 }}>{film.awards}</p>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 6 }}>AWARDS & RECOGNITION</div>
+              <p style={{ fontFamily: "var(--font-sans)", fontSize: 14, color: "#6a6560", lineHeight: 1.6 }}>{film.awards}</p>
             </div>
           )}
         </div>
@@ -379,14 +381,16 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
             onTouchStart={e => e.stopPropagation()}
             style={{
               position: "absolute",
-              bottom: details ? 560 : 120,
+              bottom: details ? 510 : 120,
               left: "50%", transform: "translateX(-50%)",
               background: "transparent", border: "none",
-              color: "#3a3535", cursor: "pointer",
-              fontFamily: "var(--font-mono)", fontSize: 9,
-              letterSpacing: "0.14em", padding: "10px 16px",
+              color: visual.accent,
+              cursor: "pointer",
+              fontFamily: "var(--font-mono)", fontSize: 10,
+              letterSpacing: "0.18em", padding: "10px 20px",
               transition: "bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)",
               zIndex: 15,
+              opacity: 0.8,
             }}
           >
             {details ? "▲  LESS" : "▼  MORE"}

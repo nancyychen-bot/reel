@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SwipeCard, { type FilmData } from "./SwipeCard";
 
 interface SwipeDeckProps {
@@ -10,22 +10,34 @@ interface SwipeDeckProps {
 }
 
 export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
+  // Internal queue — append incoming films, remove swiped ones
+  const [queue, setQueue] = useState<FilmData[]>([]);
   const triggerRef        = useRef<((dir: "like" | "pass") => void) | null>(null);
   const triggerDetailsRef = useRef<(() => void) | null>(null);
-  // track index via ref so keyboard handler is stable
-  const indexRef = useRef(0);
-  const filmsRef = useRef(films);
-  filmsRef.current = films;
+
+  // Append new films without duplicates
+  useEffect(() => {
+    setQueue(prev => {
+      const seen = new Set(prev.map(f => f.tmdbId));
+      const toAdd = films.filter(f => !seen.has(f.tmdbId));
+      return toAdd.length ? [...prev, ...toAdd] : prev;
+    });
+  }, [films]);
 
   const handleSwipe = useCallback(
     (direction: "like" | "pass", film: FilmData) => {
       onSwipe(film.tmdbId, direction);
-      indexRef.current += 1;
-      if (indexRef.current >= filmsRef.current.length) onEmpty?.();
+      setQueue(prev => {
+        const next = prev.filter(f => f.tmdbId !== film.tmdbId);
+        // Load more when running low
+        if (next.length <= 5) onEmpty?.();
+        return next;
+      });
     },
     [onSwipe, onEmpty]
   );
 
+  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowRight") triggerRef.current?.("like");
@@ -35,7 +47,7 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (films.length === 0) {
+  if (queue.length === 0) {
     return (
       <div style={{
         flex: 1,
@@ -47,7 +59,7 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
       }}>
         <div style={{
           fontFamily: "var(--font-display)",
-          fontSize: 30,
+          fontSize: 28,
           color: "#F5F1EA",
           letterSpacing: "0.01em",
           textTransform: "uppercase",
@@ -66,7 +78,7 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
     );
   }
 
-  const visible = films.slice(0, 3);
+  const visible = queue.slice(0, 3);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -85,13 +97,14 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
         ))}
       </div>
 
-      {/* Buttons — only ✕ and ♥ */}
+      {/* Buttons — ✕ and ♥ only */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         gap: 24,
         padding: "10px 0 18px",
+        flexShrink: 0,
       }}>
         <Btn onClick={() => triggerRef.current?.("pass")}
           size={56} color="#5A5550" bg="#111" border="#202020">✕</Btn>
@@ -121,7 +134,7 @@ function Btn({ children, onClick, size, color, bg, border, shadow }: {
         background: bg,
         border: `1px solid ${border}`,
         color,
-        fontSize: size > 60 ? 24 : 20,
+        fontSize: size > 60 ? 26 : 22,
         cursor: "pointer",
         display: "flex",
         alignItems: "center",

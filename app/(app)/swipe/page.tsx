@@ -164,26 +164,11 @@ export default function SwipePage() {
 
       {/* Mood bar — includes REEL logo in its padding */}
       <div style={{
-        paddingTop: 46,
+        paddingTop: 12,
         paddingBottom: 8,
         borderBottom: "1px solid #141414",
         flexShrink: 0,
       }}>
-        {/* REEL wordmark sits in the top-left safe-area gap */}
-        <div style={{
-          position: "absolute",
-          top: 14,
-          left: 16,
-          fontFamily: "var(--font-display)",
-          fontSize: 22,
-          color: "#F5F1EA",
-          textTransform: "uppercase",
-          letterSpacing: "0.01em",
-          lineHeight: 1,
-        }}>
-          Reel
-        </div>
-
         {/* Mood chips row */}
         <div style={{
           display: "flex",

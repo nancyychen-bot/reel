@@ -5,6 +5,14 @@ import type { Mood } from "@/lib/moods";
 
 const TMDB_KEY = process.env.TMDB_API_KEY;
 
+const GENRE_MAP: Record<number, string> = {
+  28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy",
+  80: "Crime", 99: "Documentary", 18: "Drama", 10751: "Family",
+  14: "Fantasy", 36: "History", 27: "Horror", 10402: "Music",
+  9648: "Mystery", 10749: "Romance", 878: "Science Fiction",
+  53: "Thriller", 10752: "War", 37: "Western",
+};
+
 // Fetch N pages of TMDB top-rated films directly (no DB required)
 async function fetchTmdbPool(pages = 10): Promise<FilmRecord[]> {
   if (!TMDB_KEY) return [];
@@ -26,10 +34,10 @@ async function fetchTmdbPool(pages = 10): Promise<FilmRecord[]> {
         title:       f.title,
         year:        parseInt(f.release_date?.slice(0, 4) ?? "0"),
         runtime:     0,
-        genres:      [], // genre_ids only here; full genres need a detail call
+        genres:      (f.genre_ids ?? []).map((id: number) => GENRE_MAP[id]).filter(Boolean),
         director:    "",
         plot:        f.overview ?? "",
-        poster_url:  `https://image.tmdb.org/t/p/w500${f.poster_path}`,
+        poster_url:  `https://image.tmdb.org/t/p/w780${f.poster_path}`,
         tmdb_rating: f.vote_average ?? 0,
         list_count:  0,
       }))

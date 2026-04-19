@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import SwipeCard, { type FilmData } from "./SwipeCard";
 
 interface SwipeDeckProps {
-  films:    FilmData[];
-  onSwipe:  (tmdbId: number, direction: "like" | "pass", film: FilmData) => void;
-  onUndo?:  (tmdbId: number) => void;
-  onEmpty?: () => void;
+  films:       FilmData[];
+  onSwipe:     (tmdbId: number, direction: "like" | "pass", film: FilmData) => void;
+  onShortlist?: (tmdbId: number, film: FilmData) => void;
+  onUndo?:     (tmdbId: number) => void;
+  onEmpty?:    () => void;
 }
 
-export default function SwipeDeck({ films, onSwipe, onUndo, onEmpty }: SwipeDeckProps) {
+export default function SwipeDeck({ films, onSwipe, onShortlist, onUndo, onEmpty }: SwipeDeckProps) {
   // Internal queue — append incoming films, remove swiped ones
   const [queue, setQueue]           = useState<FilmData[]>([]);
   const [lastSwiped, setLastSwiped] = useState<FilmData | null>(null);
@@ -149,13 +150,50 @@ export default function SwipeDeck({ films, onSwipe, onUndo, onEmpty }: SwipeDeck
         </button>
       </div>
 
+      {/* Shortlist button — above the main actions */}
+      {onShortlist && queue.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "center", paddingBottom: 6, flexShrink: 0 }}>
+          <button
+            onClick={() => {
+              const top = queue[0];
+              if (!top) return;
+              onShortlist(top.tmdbId, top);
+              handleSwipe("like", top);
+            }}
+            style={{
+              background: "none",
+              border: "1px solid #2a2218",
+              color: "#7a6540",
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              padding: "7px 18px",
+              borderRadius: 2,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#C9A96155";
+              (e.currentTarget as HTMLButtonElement).style.color = "#C9A961";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "#2a2218";
+              (e.currentTarget as HTMLButtonElement).style.color = "#7a6540";
+            }}
+          >
+            + Shortlist
+          </button>
+        </div>
+      )}
+
       {/* Buttons — ✕ and ♥ */}
       <div style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         gap: 24,
-        padding: "10px 0 18px",
+        padding: "6px 0 18px",
         flexShrink: 0,
       }}>
         <Btn onClick={() => triggerRef.current?.("pass")}

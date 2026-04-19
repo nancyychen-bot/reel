@@ -48,6 +48,25 @@ export default function SwipePage() {
       .catch(() => setLoading(false));
   }, [moods, moodsReady, page]);
 
+  const handleShortlist = useCallback(async (tmdbId: number, film: FilmData) => {
+    await fetch("/api/shortlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tmdbId,
+        film: {
+          title:      film.title,
+          year:       film.year,
+          posterUrl:  film.posterUrl,
+          genres:     film.genres,
+          plot:       film.plot,
+          tmdbRating: film.tmdbRating,
+          director:   film.director,
+        },
+      }),
+    });
+  }, []);
+
   const handleUndo = useCallback(async (tmdbId: number) => {
     await fetch("/api/swipe", {
       method: "DELETE",
@@ -267,6 +286,7 @@ export default function SwipePage() {
         <SwipeDeck
           films={films}
           onSwipe={handleSwipe}
+          onShortlist={handleShortlist}
           onUndo={handleUndo}
           onEmpty={() => setPage(p => p + 1)}
         />

@@ -58,7 +58,7 @@ export function buildDeck({
     if (seedDirectorMatch || seedGenreMatch) score += 2
 
     if (f.tmdb_rating >= 7.5) score += 1
-    if (f.list_count >= 2)    score += 1
+    if (f.list_count >= 2)    score += 2  // TMDB similarity recs get list_count=2
 
     return { film: f, score }
   })

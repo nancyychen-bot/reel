@@ -60,12 +60,31 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
   const [details,  setDetails]  = useState(false);
   const [posterUrl, setPosterUrl]  = useState<string | null>(film.posterUrl || null);
   const [posterLoaded, setPosterLoaded] = useState(false);
+  const [enriched, setEnriched] = useState<{
+    imdbId?:    string;
+    imdbRating?: number;
+    rtScore?:   number;
+    awards?:    string;
+    director?:  string;
+    runtime?:   number;
+    language?:  string;
+    country?:   string;
+  } | null>(null);
 
   const visual = {
     bg:     film.bg     ?? deriveAccent(film.title).bg,
     glow:   film.glow   ?? deriveAccent(film.title).glow,
     accent: film.accent ?? deriveAccent(film.title).accent,
   };
+
+  // Lazy-fetch OMDB enrichment when this card becomes top
+  useEffect(() => {
+    if (!isTop || enriched !== null) return;
+    fetch(`/api/omdb/${film.tmdbId}`)
+      .then(r => r.json())
+      .then(data => setEnriched(data))
+      .catch(() => setEnriched({}));
+  }, [isTop, film.tmdbId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Expose programmatic swipe + details toggle to parent (button row)
   useEffect(() => {
@@ -99,11 +118,20 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
     };
     const up = () => {
       setDragging(false);
-      const { x } = dragRef.current;
-      if (Math.abs(x) > THRESHOLD) {
+      const { x, y } = dragRef.current;
+      const absX = Math.abs(x);
+      const absY = Math.abs(y);
+      if (absX > THRESHOLD && absX >= absY) {
+        // Horizontal swipe — like or pass
         const dir = x > 0 ? "right" : "left";
         setExiting(dir);
         setTimeout(() => onSwipe(dir === "right" ? "like" : "pass", film), 430);
+      } else if (absY > 60 && absY > absX) {
+        // Vertical gesture — toggle detail panel
+        if (y > 0) setDetails(true);   // swipe down = open
+        else       setDetails(false);  // swipe up   = close
+        dragRef.current = { x: 0, y: 0 };
+        setDragState({ x: 0, y: 0 });
       } else {
         dragRef.current = { x: 0, y: 0 };
         setDragState({ x: 0, y: 0 });
@@ -132,9 +160,12 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
 
   const sx = dragState.x;
   const sy = dragState.y;
-  const rot = sx / 20;
-  const likeOp = Math.max(0, Math.min(1,  sx / 90));
-  const passOp = Math.max(0, Math.min(1, -sx / 90));
+  // Suppress horizontal motion when drag is primarily vertical
+  const isVertical = Math.abs(sy) > Math.abs(sx) && Math.abs(sy) > 20;
+  const rot    = isVertical ? 0 : sx / 20;
+  const dispSx = isVertical ? 0 : sx;
+  const likeOp = Math.max(0, Math.min(1,  dispSx / 90));
+  const passOp = Math.max(0, Math.min(1, -dispSx / 90));
   const stackSc = 1 - stackIndex * 0.04;
   const stackTy = stackIndex * -16;
 
@@ -142,7 +173,7 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
   if      (exiting === "right") tf = "translateX(135vw) rotate(22deg)";
   else if (exiting === "left")  tf = "translateX(-135vw) rotate(-22deg)";
   else if (!isTop)              tf = `scale(${stackSc}) translateY(${stackTy}px)`;
-  else                          tf = `translateX(${sx}px) translateY(${sy * 0.12}px) rotate(${rot}deg)`;
+  else                          tf = `translateX(${dispSx}px) translateY(${isVertical ? sy * 0.15 : sy * 0.12}px) rotate(${rot}deg)`;
 
   const trans = dragging ? "none" : "transform 0.48s cubic-bezier(0.25,0.46,0.45,0.94)";
 
@@ -292,13 +323,13 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
             fontFamily: "var(--font-mono)", fontSize: 12,
             color: "#5A5550", letterSpacing: "0.07em",
           }}>
-            {film.director !== "Unknown" ? film.director : ""}
+            {(enriched?.director ?? film.director) !== "Unknown" ? (enriched?.director ?? film.director) : ""}
           </div>
           <div style={{
             fontFamily: "var(--font-mono)", fontSize: 11,
             color: "#3a3a3a", letterSpacing: "0.07em", marginTop: 3,
           }}>
-            {film.country ? `${film.country} · ` : ""}{film.year}
+            {(enriched?.country ?? film.country) ? `${enriched?.country ?? film.country} · ` : ""}{film.year}
           </div>
         </div>
 
@@ -326,27 +357,43 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
           </p>
 
           {/* Ratings */}
-          <div style={{ display: "flex", gap: 24, marginBottom: 18 }}>
+          <div style={{ display: "flex", gap: 24, marginBottom: 18, flexWrap: "wrap" }}>
             {film.tmdbRating > 0 && (
               <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>TMDB RATING</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>TMDB</div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{film.tmdbRating.toFixed(1)}</div>
               </div>
             )}
-            {film.rtScore != null && (
+            {(enriched?.imdbRating ?? film.rtScore) != null && (
               <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>ROTTEN TOMATOES</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{film.rtScore}%</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>IMDB</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched?.imdbRating?.toFixed(1) ?? "—"}</div>
+              </div>
+            )}
+            {(enriched?.rtScore != null) && (
+              <div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>RT</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched.rtScore}%</div>
+              </div>
+            )}
+            {enriched === null && isTop && (
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#2a2a2a", letterSpacing: "0.12em", alignSelf: "center" }}>
+                Loading ratings…
               </div>
             )}
           </div>
 
           {/* Meta */}
           <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>
-            {[["RUNTIME", film.runtime ? `${film.runtime} min` : ""], ["LANGUAGE", film.language ?? ""]].filter(([,v]) => v).map(([k, v]) => (
+            {[
+              ["DIRECTOR", enriched?.director ?? (film.director !== "Unknown" ? film.director : "")],
+              ["RUNTIME",  (enriched?.runtime ?? film.runtime) ? `${enriched?.runtime ?? film.runtime} min` : ""],
+              ["LANGUAGE", enriched?.language ?? film.language ?? ""],
+              ["COUNTRY",  enriched?.country  ?? film.country  ?? ""],
+            ].filter(([, v]) => v).map(([k, v]) => (
               <div key={k}>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.1em", marginBottom: 3 }}>{k}</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "#8A8580" }}>{v}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "#8A8580" }}>{v}</div>
               </div>
             ))}
           </div>
@@ -365,10 +412,10 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
           )}
 
           {/* Awards */}
-          {film.awards && (
+          {(enriched?.awards ?? film.awards) && (
             <div>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 6 }}>AWARDS & RECOGNITION</div>
-              <p style={{ fontFamily: "var(--font-sans)", fontSize: 14, color: "#6a6560", lineHeight: 1.6 }}>{film.awards}</p>
+              <p style={{ fontFamily: "var(--font-sans)", fontSize: 14, color: "#6a6560", lineHeight: 1.6 }}>{enriched?.awards ?? film.awards}</p>
             </div>
           )}
         </div>

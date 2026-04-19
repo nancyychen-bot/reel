@@ -48,11 +48,23 @@ export default function SwipePage() {
       .catch(() => setLoading(false));
   }, [moods, moodsReady, page]);
 
-  const handleSwipe = useCallback(async (tmdbId: number, direction: "like" | "pass") => {
+  const handleSwipe = useCallback(async (tmdbId: number, direction: "like" | "pass", film: FilmData) => {
     const res = await fetch("/api/swipe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tmdbId, direction }),
+      body: JSON.stringify({
+        tmdbId,
+        direction,
+        film: {
+          title:      film.title,
+          year:       film.year,
+          posterUrl:  film.posterUrl,
+          genres:     film.genres,
+          plot:       film.plot,
+          tmdbRating: film.tmdbRating,
+          director:   film.director,
+        },
+      }),
     });
     const data = await res.json();
     if (data.match) setMatch(data.match);

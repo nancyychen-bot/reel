@@ -5,7 +5,7 @@ import SwipeCard, { type FilmData } from "./SwipeCard";
 
 interface SwipeDeckProps {
   films:    FilmData[];
-  onSwipe:  (tmdbId: number, direction: "like" | "pass") => void;
+  onSwipe:  (tmdbId: number, direction: "like" | "pass", film: FilmData) => void;
   onEmpty?: () => void;
 }
 
@@ -26,7 +26,7 @@ export default function SwipeDeck({ films, onSwipe, onEmpty }: SwipeDeckProps) {
 
   const handleSwipe = useCallback(
     (direction: "like" | "pass", film: FilmData) => {
-      onSwipe(film.tmdbId, direction);
+      onSwipe(film.tmdbId, direction, film);
       setQueue(prev => {
         const next = prev.filter(f => f.tmdbId !== film.tmdbId);
         // Load more when running low

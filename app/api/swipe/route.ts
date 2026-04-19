@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
-  const { tmdbId, direction, source } = await request.json();
+  const { tmdbId, direction, source, film: filmData } = await request.json();
 
   if (!tmdbId || !["like", "pass"].includes(direction)) {
     return Response.json({ error: "Invalid params" }, { status: 400 });
@@ -12,14 +12,30 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Get imdb_id from tmdb_id
-  const { data: movie } = await supabase
+  // Get movie record (or create one from client-provided data for TMDB fallback films)
+  let { data: movie } = await supabase
     .from("movies")
     .select("imdb_id, title, year, director, poster_url")
     .eq("tmdb_id", tmdbId)
     .maybeSingle();
 
-  if (!movie) return Response.json({ error: "Film not found" }, { status: 404 });
+  if (!movie) {
+    if (!filmData) return Response.json({ error: "Film not found" }, { status: 404 });
+    // Use numeric tmdbId string as placeholder imdb_id until OMDB enriches it
+    const placeholderId = String(tmdbId);
+    await supabase.from("movies").upsert({
+      tmdb_id:     tmdbId,
+      imdb_id:     placeholderId,
+      title:       filmData.title    ?? "",
+      year:        filmData.year     ?? 0,
+      poster_url:  filmData.posterUrl ?? "",
+      genres:      filmData.genres   ?? [],
+      plot:        filmData.plot     ?? "",
+      tmdb_rating: filmData.tmdbRating ?? 0,
+      director:    filmData.director ?? "",
+    }, { onConflict: "tmdb_id" });
+    movie = { imdb_id: placeholderId, title: filmData.title, year: filmData.year, director: filmData.director, poster_url: filmData.posterUrl };
+  }
 
   // Upsert swipe (unique per user+film)
   await supabase.from("swipes").upsert({

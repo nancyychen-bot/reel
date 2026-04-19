@@ -13,21 +13,35 @@ const GENRE_MAP: Record<number, string> = {
   53: "Thriller", 10752: "War", 37: "Western",
 };
 
-// Fetch N pages of TMDB top-rated films directly (no DB required)
-async function fetchTmdbPool(pages = 10): Promise<FilmRecord[]> {
+// Fetch critically acclaimed films via TMDB Discover.
+// sort_by=vote_average.desc + vote_count.gte=10000 surfaces genuinely
+// acclaimed films (Godfather, Schindler's List, etc.) rather than
+// vote-count-boosted blockbusters that top_rated returns.
+async function fetchTmdbPool(pages = 20): Promise<FilmRecord[]> {
   if (!TMDB_KEY) return [];
+
+  const BASE_PARAMS = [
+    `api_key=${TMDB_KEY}`,
+    "sort_by=vote_average.desc",
+    "vote_count.gte=10000",   // enough votes to be reliable
+    "vote_average.gte=7.0",   // only well-rated films
+    "include_adult=false",
+  ].join("&");
+
   const results = await Promise.all(
     Array.from({ length: pages }, (_, i) =>
       fetch(
-        `https://api.themoviedb.org/3/movie/top_rated?api_key=${TMDB_KEY}&language=en-US&page=${i + 1}`
+        `https://api.themoviedb.org/3/discover/movie?${BASE_PARAMS}&page=${i + 1}`
       )
         .then(r => r.json())
         .catch(() => ({ results: [] }))
     )
   );
+
+  const seen = new Set<number>();
   return results.flatMap((p: any) =>
     (p.results ?? [])
-      .filter((f: any) => f.poster_path && f.title)
+      .filter((f: any) => f.poster_path && f.title && !seen.has(f.id) && seen.add(f.id))
       .map((f: any): FilmRecord => ({
         tmdb_id:     f.id,
         imdb_id:     "",

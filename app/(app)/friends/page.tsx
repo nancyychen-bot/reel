@@ -38,11 +38,12 @@ export default function FriendsPage() {
     const enriched = await Promise.all(fs.map(async f => {
       const otherId = f.user_id === user.id ? f.friend_id : f.user_id;
       const { data: profile } = await supabase.from("profiles").select("username").eq("id", otherId).single();
+      const [ua, ub] = [user.id, otherId].sort();
       const { count } = await supabase
         .from("matches")
         .select("id", { count: "exact", head: true })
-        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-        .or(`user_a.eq.${otherId},user_b.eq.${otherId}`);
+        .eq("user_a", ua)
+        .eq("user_b", ub);
 
       let status: Friend["status"] = "accepted";
       if (f.status === "pending") {
@@ -66,7 +67,7 @@ export default function FriendsPage() {
     setSearchStatus("idle");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase.from("profiles").select("id, username").eq("username", search.trim()).maybeSingle();
+    const { data } = await supabase.from("profiles").select("id, username").ilike("username", search.trim()).maybeSingle();
     if (!data) { setSearchStatus("notfound"); return; }
     if (data.id === user.id) { setSearchStatus("self"); return; }
     setSearchResult(data);
@@ -96,7 +97,7 @@ export default function FriendsPage() {
   const outgoing  = friends.filter(f => f.status === "pending_sent");
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0A0A0A" }}>
+    <div style={{ position: "absolute", inset: 0, background: "#0A0A0A", overflowY: "auto", paddingBottom: 70 }}>
       {/* Header */}
       <header style={{ padding: "24px 24px 0", borderBottom: "1px solid rgba(245,241,234,0.06)", paddingBottom: 20 }}>
         <h1 style={{

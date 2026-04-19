@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   const { tmdbId, direction, source, film: filmData } = await request.json();
@@ -21,29 +22,32 @@ export async function POST(request: NextRequest) {
 
   if (!movie) {
     if (!filmData) return Response.json({ error: "Film not found" }, { status: 404 });
-    // Use numeric tmdbId string as placeholder imdb_id until OMDB enriches it
+    // Use service role to bypass RLS — movies table is read-only for regular users
+    const admin = createAdminClient();
     const placeholderId = String(tmdbId);
-    await supabase.from("movies").upsert({
+    const { error: upsertErr } = await admin.from("movies").upsert({
       tmdb_id:     tmdbId,
       imdb_id:     placeholderId,
-      title:       filmData.title    ?? "",
-      year:        filmData.year     ?? 0,
+      title:       filmData.title     ?? "",
+      year:        filmData.year      ?? 0,
       poster_url:  filmData.posterUrl ?? "",
-      genres:      filmData.genres   ?? [],
-      plot:        filmData.plot     ?? "",
+      genres:      filmData.genres    ?? [],
+      plot:        filmData.plot      ?? "",
       tmdb_rating: filmData.tmdbRating ?? 0,
-      director:    filmData.director ?? "",
+      director:    filmData.director  ?? "",
     }, { onConflict: "tmdb_id" });
+    if (upsertErr) console.error("movies upsert failed:", upsertErr.message);
     movie = { imdb_id: placeholderId, title: filmData.title, year: filmData.year, director: filmData.director, poster_url: filmData.posterUrl };
   }
 
   // Upsert swipe (unique per user+film)
-  await supabase.from("swipes").upsert({
+  const { error: swipeErr } = await supabase.from("swipes").upsert({
     user_id:   user.id,
     imdb_id:   movie.imdb_id,
     direction,
     source:    source ?? "async",
   }, { onConflict: "user_id,imdb_id" });
+  if (swipeErr) console.error("swipes upsert failed:", swipeErr.message);
 
   // Check for async match if liked
   if (direction === "like") {

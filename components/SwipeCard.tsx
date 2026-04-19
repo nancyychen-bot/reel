@@ -108,6 +108,7 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
   useEffect(() => {
     if (!dragging) return;
     const move = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault(); // stop iOS from scrolling while dragging
       const cx = (e as MouseEvent).clientX ?? (e as TouchEvent).touches?.[0]?.clientX;
       const cy = (e as MouseEvent).clientY ?? (e as TouchEvent).touches?.[0]?.clientY;
       if (cx == null) return;
@@ -139,7 +140,7 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
     };
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
-    document.addEventListener("touchmove", move, { passive: true });
+    document.addEventListener("touchmove", move, { passive: false });
     document.addEventListener("touchend", up);
     return () => {
       document.removeEventListener("mousemove", move);
@@ -358,21 +359,15 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, triggerRef
 
           {/* Ratings */}
           <div style={{ display: "flex", gap: 24, marginBottom: 18, flexWrap: "wrap" }}>
-            {film.tmdbRating > 0 && (
+            {enriched?.imdbRating != null && (
               <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>TMDB</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{film.tmdbRating.toFixed(1)}</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>IMDb</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched.imdbRating.toFixed(1)}</div>
               </div>
             )}
-            {(enriched?.imdbRating ?? film.rtScore) != null && (
+            {enriched?.rtScore != null && (
               <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>IMDB</div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched?.imdbRating?.toFixed(1) ?? "—"}</div>
-              </div>
-            )}
-            {(enriched?.rtScore != null) && (
-              <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>RT</div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>Rotten Tomatoes</div>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched.rtScore}%</div>
               </div>
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -11,25 +11,51 @@ const GENRES = [
   "War", "Western", "Foreign", "Classic", "Experimental",
 ];
 
-interface TMDBResult {
-  id: number;
-  title: string;
-  release_date: string;
-  poster_path: string | null;
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  background: "#141414",
+  border: "1px solid rgba(245,241,234,0.1)",
+  color: "#F5F1EA",
+  caretColor: "#F5F1EA",
+  fontFamily: "var(--font-mono)",
+  fontSize: 16,
+  padding: "14px 16px",
+  borderRadius: 2,
+  outline: "none",
+  letterSpacing: "0.04em",
+};
+
+interface TopFilm {
+  id:          number;
+  title:       string;
+  year:        string;
+  poster_path: string;
+  rating:      number;
 }
+
+const MIN_PICKS = 3;
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"username" | "films" | "genres">("username");
-  const [username, setUsername] = useState("");
+  const [step, setStep]               = useState<"username" | "films" | "genres">("username");
+  const [username, setUsername]       = useState("");
   const [usernameError, setUsernameError] = useState("");
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<TMDBResult[]>([]);
-  const [selected, setSelected] = useState<TMDBResult[]>([]);
-  const [genres, setGenres] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState(false);
+  const [topFilms, setTopFilms]       = useState<TopFilm[]>([]);
+  const [filmsLoading, setFilmsLoading] = useState(false);
+  const [selected, setSelected]       = useState<Set<number>>(new Set());
+  const [genres, setGenres]           = useState<Set<string>>(new Set());
+  const [saving, setSaving]           = useState(false);
 
   const supabase = createClient();
+
+  // Pre-load top films in background as soon as page mounts
+  useEffect(() => {
+    setFilmsLoading(true);
+    fetch("/api/films/top")
+      .then(r => r.json())
+      .then(d => { setTopFilms(d.films ?? []); setFilmsLoading(false); })
+      .catch(() => setFilmsLoading(false));
+  }, []);
 
   async function checkUsername(e: React.FormEvent) {
     e.preventDefault();
@@ -39,24 +65,15 @@ export default function OnboardingPage() {
       return;
     }
     const { data } = await supabase.from("profiles").select("id").eq("username", username).maybeSingle();
-    if (data) { setUsernameError("Username taken."); return; }
+    if (data) { setUsernameError("That username is taken."); return; }
     setStep("films");
   }
 
-  async function searchFilms(q: string) {
-    setQuery(q);
-    if (q.length < 2) { setResults([]); return; }
-    const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
-    setResults(data.results ?? []);
-  }
-
-  function toggleFilm(film: TMDBResult) {
+  function toggleFilm(id: number) {
     setSelected(prev => {
-      const exists = prev.find(f => f.id === film.id);
-      if (exists) return prev.filter(f => f.id !== film.id);
-      if (prev.length >= 5) return prev;
-      return [...prev, film];
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
   }
 
@@ -81,88 +98,114 @@ export default function OnboardingPage() {
 
     await supabase.from("user_preferences").upsert({
       user_id: user.id,
-      favorite_film_tmdb_ids: selected.map(f => f.id),
+      favorite_film_tmdb_ids: Array.from(selected),
       preferred_genres: Array.from(genres),
     });
 
     router.push("/swipe");
   }
 
+  // ── Shared header ───────────────────────────────────────────
+  const steps = ["username", "films", "genres"];
+  const stepIndex = steps.indexOf(step);
+
   return (
-    <main style={{
-      minHeight: "100vh",
+    <div style={{
+      position: "absolute",
+      inset: 0,
       background: "#0A0A0A",
       display: "flex",
       flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "40px 24px",
+      overflow: "hidden",
     }}>
-      {/* Wordmark */}
-      <div style={{ marginBottom: 40, textAlign: "center" }}>
-        <div style={{ display: "inline-block", transform: "scaleX(0.62)", transformOrigin: "center" }}>
-          <span style={{
-            fontFamily: "var(--font-serif)",
-            fontSize: 56,
-            fontWeight: 900,
-            color: "#F5F1EA",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-          }}>Reel</span>
+      {/* Top bar */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "20px 24px 16px",
+        flexShrink: 0,
+      }}>
+        <div style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 28,
+          color: "#F5F1EA",
+          textTransform: "uppercase",
+          letterSpacing: "0.01em",
+        }}>
+          Reel
+        </div>
+
+        {/* Step dots */}
+        <div style={{ display: "flex", gap: 6 }}>
+          {steps.map((s, i) => (
+            <div key={s} style={{
+              width: i === stepIndex ? 20 : 6,
+              height: 6,
+              borderRadius: 3,
+              background: i === stepIndex ? "#E8453C" : i < stepIndex ? "rgba(245,241,234,0.3)" : "rgba(245,241,234,0.1)",
+              transition: "width 0.3s, background 0.3s",
+            }} />
+          ))}
         </div>
       </div>
 
-      {/* Step indicator */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 36 }}>
-        {["username", "films", "genres"].map((s, i) => (
-          <div key={s} style={{
-            width: 24,
-            height: 2,
-            background: step === s ? "#8B2A2A" : "rgba(245,241,234,0.12)",
-            borderRadius: 1,
-            transition: "background 0.3s",
-          }} />
-        ))}
-      </div>
+      {/* ── Step 1: Username ───────────────────────────────── */}
+      {step === "username" && (
+        <div style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "0 24px 48px",
+        }}>
+          <div style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9,
+            letterSpacing: "0.2em",
+            color: "#E8453C",
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}>
+            Step 1 of 3
+          </div>
+          <h1 style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 40,
+            color: "#F5F1EA",
+            textTransform: "uppercase",
+            letterSpacing: "0.01em",
+            lineHeight: 1,
+            marginBottom: 8,
+          }}>
+            Pick a username
+          </h1>
+          <p style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: 13,
+            color: "#5A5550",
+            marginBottom: 32,
+            lineHeight: 1.6,
+          }}>
+            Friends will find you by this name.
+          </p>
 
-      <div style={{ width: "100%", maxWidth: 420 }}>
-
-        {/* Step 1: Username */}
-        {step === "username" && (
           <form onSubmit={checkUsername}>
-            <h1 style={{
-              fontFamily: "var(--font-serif)",
-              fontSize: 32,
-              fontStyle: "italic",
-              fontWeight: 700,
-              color: "#F5F1EA",
-              marginBottom: 8,
-            }}>
-              Choose a username
-            </h1>
-            <p style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "#5A5550", marginBottom: 28 }}>
-              Friends will find you by this name.
-            </p>
             <input
               value={username}
-              onChange={e => setUsername(e.target.value.toLowerCase())}
+              onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
               placeholder="yourname"
-              style={{
-                width: "100%",
-                background: "#141414",
-                border: "1px solid rgba(245,241,234,0.1)",
-                color: "#F5F1EA",
-                fontFamily: "var(--font-mono)",
-                fontSize: 16,
-                padding: "14px 16px",
-                borderRadius: 2,
-                outline: "none",
-                marginBottom: 8,
-                letterSpacing: "0.04em",
-              }}
+              autoFocus
+              style={inputStyle}
             />
             {usernameError && (
-              <p style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "#8B2A2A", marginBottom: 12 }}>
+              <p style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: 12,
+                color: "#E8453C",
+                margin: "8px 0 0",
+                lineHeight: 1.5,
+              }}>
                 {usernameError}
               </p>
             )}
@@ -170,9 +213,9 @@ export default function OnboardingPage() {
               type="submit"
               style={{
                 width: "100%",
-                background: "#8B2A2A",
+                background: "#E8453C",
                 border: "none",
-                color: "#F5F1EA",
+                color: "#fff",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
                 letterSpacing: "0.16em",
@@ -180,170 +223,219 @@ export default function OnboardingPage() {
                 padding: "14px",
                 cursor: "pointer",
                 borderRadius: 2,
-                marginTop: 8,
+                marginTop: 16,
               }}
             >
-              Continue →
+              Continue
             </button>
           </form>
-        )}
+        </div>
+      )}
 
-        {/* Step 2: 5 seed films */}
-        {step === "films" && (
-          <div>
-            <h1 style={{
-              fontFamily: "var(--font-serif)",
-              fontSize: 32,
-              fontStyle: "italic",
-              fontWeight: 700,
-              color: "#F5F1EA",
+      {/* ── Step 2: Film grid ──────────────────────────────── */}
+      {step === "films" && (
+        <>
+          {/* Fixed header */}
+          <div style={{ padding: "0 24px 16px", flexShrink: 0 }}>
+            <div style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              color: "#E8453C",
+              textTransform: "uppercase",
               marginBottom: 8,
             }}>
-              Pick 5 films you love
+              Step 2 of 3
+            </div>
+            <h1 style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 36,
+              color: "#F5F1EA",
+              textTransform: "uppercase",
+              letterSpacing: "0.01em",
+              lineHeight: 1,
+              marginBottom: 4,
+            }}>
+              Films you love
             </h1>
-            <p style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "#5A5550", marginBottom: 24 }}>
-              We'll use these to calibrate your feed.
+            <p style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
+              color: "#5A5550",
+              lineHeight: 1.5,
+            }}>
+              Tap to pick at least {MIN_PICKS}. We'll calibrate your feed.
             </p>
+          </div>
 
-            {/* Selected */}
-            {selected.length > 0 && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-                {selected.map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => toggleFilm(f)}
-                    style={{
-                      background: "rgba(139,42,42,0.15)",
-                      border: "1px solid rgba(139,42,42,0.4)",
-                      color: "#F5F1EA",
-                      fontFamily: "var(--font-sans)",
-                      fontSize: 11,
-                      padding: "5px 10px",
-                      borderRadius: 2,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    {f.title} <span style={{ color: "#8B2A2A" }}>×</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <input
-              value={query}
-              onChange={e => searchFilms(e.target.value)}
-              placeholder="Search any film…"
-              style={{
-                width: "100%",
-                background: "#141414",
-                border: "1px solid rgba(245,241,234,0.1)",
-                color: "#F5F1EA",
-                fontFamily: "var(--font-sans)",
-                fontSize: 14,
-                padding: "12px 14px",
-                borderRadius: 2,
-                outline: "none",
-                marginBottom: 12,
-              }}
-            />
-
-            {results.length > 0 && (
+          {/* Scrollable poster grid */}
+          <div style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "0 12px",
+          }}>
+            {filmsLoading ? (
               <div style={{
-                border: "1px solid rgba(245,241,234,0.08)",
-                borderRadius: 2,
-                overflow: "hidden",
-                marginBottom: 24,
-                maxHeight: 280,
-                overflowY: "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "#3a3a3a",
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
               }}>
-                {results.slice(0, 8).map(film => {
-                  const isSelected = selected.some(f => f.id === film.id);
+                Loading…
+              </div>
+            ) : (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 6,
+                paddingBottom: 100,
+              }}>
+                {topFilms.map(film => {
+                  const picked = selected.has(film.id);
                   return (
                     <button
                       key={film.id}
-                      onClick={() => toggleFilm(film)}
+                      onClick={() => toggleFilm(film.id)}
                       style={{
-                        width: "100%",
-                        background: isSelected ? "rgba(139,42,42,0.12)" : "transparent",
-                        border: "none",
-                        borderBottom: "1px solid rgba(245,241,234,0.06)",
-                        color: "#F5F1EA",
-                        fontFamily: "var(--font-sans)",
-                        fontSize: 13,
-                        padding: "12px 14px",
-                        cursor: selected.length >= 5 && !isSelected ? "not-allowed" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        textAlign: "left",
-                        opacity: selected.length >= 5 && !isSelected ? 0.4 : 1,
+                        position: "relative",
+                        aspectRatio: "2/3",
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        border: picked ? "2px solid #E8453C" : "2px solid transparent",
+                        cursor: "pointer",
+                        background: "#141414",
+                        padding: 0,
+                        transition: "border-color 0.15s",
                       }}
                     >
-                      {film.poster_path && (
-                        <img
-                          src={`https://image.tmdb.org/t/p/w92${film.poster_path}`}
-                          alt=""
-                          style={{ width: 32, height: 48, objectFit: "cover", borderRadius: 1, flexShrink: 0 }}
-                        />
-                      )}
-                      <div>
-                        <div style={{ fontWeight: 500 }}>{film.title}</div>
-                        <div style={{ color: "#5A5550", fontSize: 11, fontFamily: "var(--font-mono)", marginTop: 2 }}>
-                          {film.release_date?.slice(0, 4) ?? "—"}
+                      <img
+                        src={`https://image.tmdb.org/t/p/w185${film.poster_path}`}
+                        alt={film.title}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        loading="lazy"
+                      />
+                      {/* Overlay when selected */}
+                      {picked && (
+                        <div style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: "rgba(232,69,60,0.25)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}>
+                          <div style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            background: "#E8453C",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 14,
+                            color: "#fff",
+                          }}>
+                            ✓
+                          </div>
                         </div>
-                      </div>
-                      {isSelected && (
-                        <span style={{ marginLeft: "auto", color: "#8B2A2A", fontSize: 16 }}>✓</span>
                       )}
                     </button>
                   );
                 })}
               </div>
             )}
+          </div>
 
+          {/* Sticky footer CTA */}
+          <div style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: "12px 24px 28px",
+            background: "linear-gradient(to top, #0A0A0A 70%, transparent)",
+          }}>
             <button
               onClick={() => setStep("genres")}
-              disabled={selected.length < 3}
+              disabled={selected.size < MIN_PICKS}
               style={{
                 width: "100%",
-                background: selected.length >= 3 ? "#8B2A2A" : "transparent",
-                border: "1px solid rgba(245,241,234,0.1)",
-                color: selected.length >= 3 ? "#F5F1EA" : "#5A5550",
+                background: selected.size >= MIN_PICKS ? "#E8453C" : "#141414",
+                border: `1px solid ${selected.size >= MIN_PICKS ? "#E8453C" : "rgba(245,241,234,0.1)"}`,
+                color: selected.size >= MIN_PICKS ? "#fff" : "#3a3a3a",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
                 letterSpacing: "0.16em",
                 textTransform: "uppercase",
                 padding: "14px",
-                cursor: selected.length >= 3 ? "pointer" : "not-allowed",
+                cursor: selected.size >= MIN_PICKS ? "pointer" : "not-allowed",
                 borderRadius: 2,
+                transition: "background 0.2s, color 0.2s",
               }}
             >
-              {selected.length >= 3 ? `Continue with ${selected.length} films →` : `Pick at least 3 films (${selected.length}/5)`}
+              {selected.size >= MIN_PICKS
+                ? `Continue — ${selected.size} film${selected.size !== 1 ? "s" : ""} selected`
+                : `Pick at least ${MIN_PICKS} (${selected.size} so far)`}
             </button>
           </div>
-        )}
+        </>
+      )}
 
-        {/* Step 3: Genres */}
-        {step === "genres" && (
-          <div>
-            <h1 style={{
-              fontFamily: "var(--font-serif)",
-              fontSize: 32,
-              fontStyle: "italic",
-              fontWeight: 700,
-              color: "#F5F1EA",
+      {/* ── Step 3: Genres ─────────────────────────────────── */}
+      {step === "genres" && (
+        <div style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}>
+          <div style={{ padding: "0 24px 20px", flexShrink: 0 }}>
+            <div style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              color: "#E8453C",
+              textTransform: "uppercase",
               marginBottom: 8,
             }}>
-              What genres do you love?
+              Step 3 of 3
+            </div>
+            <h1 style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 36,
+              color: "#F5F1EA",
+              textTransform: "uppercase",
+              letterSpacing: "0.01em",
+              lineHeight: 1,
+              marginBottom: 4,
+            }}>
+              Your genres
             </h1>
-            <p style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "#5A5550", marginBottom: 24 }}>
+            <p style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
+              color: "#5A5550",
+            }}>
               Pick as many as you like.
             </p>
+          </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 32 }}>
+          <div style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "0 24px",
+          }}>
+            <div style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              paddingBottom: 100,
+            }}>
               {GENRES.map(g => {
                 const active = genres.has(g);
                 return (
@@ -351,12 +443,12 @@ export default function OnboardingPage() {
                     key={g}
                     onClick={() => toggleGenre(g)}
                     style={{
-                      background: "transparent",
-                      border: `1.5px solid ${active ? "#8B2A2A" : "rgba(245,241,234,0.1)"}`,
+                      background: active ? "rgba(232,69,60,0.12)" : "transparent",
+                      border: `1.5px solid ${active ? "#E8453C" : "rgba(245,241,234,0.1)"}`,
                       color: active ? "#F5F1EA" : "#8A8580",
                       fontFamily: "var(--font-sans)",
-                      fontSize: 12,
-                      padding: "7px 14px",
+                      fontSize: 13,
+                      padding: "9px 16px",
                       cursor: "pointer",
                       borderRadius: 2,
                       transition: "all 0.15s",
@@ -367,15 +459,24 @@ export default function OnboardingPage() {
                 );
               })}
             </div>
+          </div>
 
+          <div style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: "12px 24px 28px",
+            background: "linear-gradient(to top, #0A0A0A 70%, transparent)",
+          }}>
             <button
               onClick={finish}
               disabled={saving}
               style={{
                 width: "100%",
-                background: "#8B2A2A",
+                background: "#E8453C",
                 border: "none",
-                color: "#F5F1EA",
+                color: "#fff",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
                 letterSpacing: "0.16em",
@@ -386,11 +487,11 @@ export default function OnboardingPage() {
                 opacity: saving ? 0.6 : 1,
               }}
             >
-              {saving ? "Setting up your feed…" : "Start watching →"}
+              {saving ? "Setting up your feed…" : "Start swiping"}
             </button>
           </div>
-        )}
-      </div>
-    </main>
+        </div>
+      )}
+    </div>
   );
 }

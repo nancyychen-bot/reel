@@ -22,7 +22,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Reel — What should we watch?",
+  title: "Reel",
   description: "Tinder for movies. Match films with friends.",
 };
 

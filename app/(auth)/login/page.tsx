@@ -9,6 +9,7 @@ const input: React.CSSProperties = {
   background: "#141414",
   border: "1px solid rgba(245,241,234,0.1)",
   color: "#F5F1EA",
+  caretColor: "#F5F1EA",
   fontFamily: "var(--font-sans)",
   fontSize: 13,
   padding: "12px 14px",

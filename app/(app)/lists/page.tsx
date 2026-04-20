@@ -393,10 +393,11 @@ export default function ListsPage() {
   }
 
   async function addToShortlist(item: FilmCell) {
+    if (!item.tmdbId) return;
     const res = await fetch("/api/shortlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tmdbId: parseInt(item.id) || 0, film: { title: item.title, year: item.year, posterUrl: item.posterUrl } }),
+      body: JSON.stringify({ tmdbId: item.tmdbId, film: { title: item.title, year: item.year, posterUrl: item.posterUrl } }),
     });
     if (res.ok) setShortlisted(prev => new Set([...prev, item.id]));
   }

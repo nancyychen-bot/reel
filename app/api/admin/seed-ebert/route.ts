@@ -11,8 +11,7 @@ import { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EBERT_FILMS } from "@/lib/ebert-films";
 
-const TMDB_KEY  = process.env.TMDB_API_KEY!;
-const BATCH     = 20;
+const TMDB_KEY = process.env.TMDB_API_KEY!;
 
 const GENRE_MAP: Record<number, string> = {
   28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy",
@@ -48,56 +47,49 @@ async function fetchDetails(tmdbId: number): Promise<any | null> {
 
 export async function GET(request: NextRequest) {
   const offset = parseInt(request.nextUrl.searchParams.get("offset") ?? "0");
-  const batch  = EBERT_FILMS.slice(offset, offset + BATCH);
+  const limit  = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "50"), 100);
+  const batch  = EBERT_FILMS.slice(offset, offset + limit);
   const admin  = createAdminClient();
 
-  const results: { title: string; year: number; tmdbId: number | null; status: string }[] = [];
-
-  for (const film of batch) {
+  // Process all films in parallel
+  const results = await Promise.all(batch.map(async film => {
     try {
       const hit = await searchTmdb(film.title, film.year);
-      if (!hit) {
-        results.push({ ...film, tmdbId: null, status: "not_found" });
-        continue;
-      }
+      if (!hit) return { ...film, tmdbId: null as number | null, status: "not_found" };
 
       const detail = await fetchDetails(hit.id);
-      if (!detail) {
-        results.push({ ...film, tmdbId: hit.id, status: "details_failed" });
-        continue;
-      }
+      if (!detail) return { ...film, tmdbId: hit.id as number | null, status: "details_failed" };
 
       const director = (detail.credits?.crew ?? [])
         .find((c: any) => c.job === "Director")?.name ?? "";
-
       const genres = (detail.genres ?? []).map((g: any) => GENRE_MAP[g.id] ?? g.name).filter(Boolean);
 
       await admin.from("movies").upsert({
-        tmdb_id:         detail.id,
-        imdb_id:         detail.imdb_id || String(detail.id),
-        title:           detail.title,
-        year:            parseInt(detail.release_date?.slice(0, 4) ?? "0") || film.year,
-        poster_url:      detail.poster_path ? `https://image.tmdb.org/t/p/w780${detail.poster_path}` : "",
+        tmdb_id:           detail.id,
+        imdb_id:           detail.imdb_id || String(detail.id),
+        title:             detail.title,
+        year:              parseInt(detail.release_date?.slice(0, 4) ?? "0") || film.year,
+        poster_url:        detail.poster_path ? `https://image.tmdb.org/t/p/w780${detail.poster_path}` : "",
         genres,
-        plot:            detail.overview ?? "",
-        tmdb_rating:     detail.vote_average ?? 0,
+        plot:              detail.overview ?? "",
+        tmdb_rating:       detail.vote_average ?? 0,
         director,
-        runtime_minutes: detail.runtime ?? null,
+        runtime_minutes:   detail.runtime ?? null,
         ebert_great_movie: true,
       }, { onConflict: "tmdb_id" });
 
-      results.push({ ...film, tmdbId: detail.id, status: "ok" });
+      return { ...film, tmdbId: detail.id as number | null, status: "ok" };
     } catch (err: any) {
-      results.push({ ...film, tmdbId: null, status: `error: ${err.message}` });
+      return { ...film, tmdbId: null as number | null, status: `error: ${err.message}` };
     }
-  }
+  }));
 
   return Response.json({
     offset,
     processed: batch.length,
     total: EBERT_FILMS.length,
     done: offset + batch.length >= EBERT_FILMS.length,
-    next_offset: offset + BATCH,
+    next_offset: offset + limit,
     results,
   });
 }

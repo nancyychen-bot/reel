@@ -245,12 +245,22 @@ export async function GET(request: NextRequest) {
   const allSwipedImdbIds = (swipes ?? []).map((s: any) => s.imdb_id).filter(Boolean);
   const likedImdbSet     = new Set((swipes ?? []).filter((s: any) => s.direction === "like").map((s: any) => s.imdb_id));
 
+  // Numeric placeholder imdb_ids (e.g. "12345") ARE the tmdb_id — add them directly.
+  // This covers discover films whose movies upsert may have failed.
+  const directTmdbIds = new Set<number>();
+  for (const id of allSwipedImdbIds) {
+    const n = parseInt(id);
+    if (!isNaN(n)) directTmdbIds.add(n);
+  }
+
   // ── Build filter-aware DB query ──────────────────────────────────────────
   const MOVIE_SELECT = "tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating";
 
-  // Swipe lookup runs in parallel with everything else
-  const swipedMoviesPromise = allSwipedImdbIds.length > 0
-    ? supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", allSwipedImdbIds.slice(0, 1000))
+  // Swipe lookup: resolve real imdb_ids (tt...) → tmdb_id via movies table.
+  // No slice limit — a user can have thousands of swipes.
+  const realImdbIds = allSwipedImdbIds.filter(id => isNaN(parseInt(id)));
+  const swipedMoviesPromise = realImdbIds.length > 0
+    ? supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", realImdbIds)
     : Promise.resolve({ data: [] as any[] });
 
   let dbPool: any[] = [];
@@ -293,10 +303,9 @@ export async function GET(request: NextRequest) {
 
   const { data: swipedMoviesData } = await swipedMoviesPromise;
 
-  // Build swipedIds
-  const swipedIds = new Set<number>();
+  // Build swipedIds: movies-table lookup (real imdb_ids) + direct numeric ids
+  const swipedIds = new Set<number>(directTmdbIds);
   (swipedMoviesData ?? []).forEach((m: any) => swipedIds.add(m.tmdb_id));
-  allSwipedImdbIds.forEach((id: string) => { const n = parseInt(id); if (!isNaN(n)) swipedIds.add(n); });
 
   const likedTmdbIds: number[] = (swipedMoviesData ?? [])
     .filter((m: any) => likedImdbSet.has(m.imdb_id))

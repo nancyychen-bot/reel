@@ -111,14 +111,29 @@ export default function LiveRoomPage() {
         .on("postgres_changes", {
           event: "UPDATE", schema: "public",
           table: "rooms", filter: `id=eq.${r.id}`,
-        }, async (payload) => {
-          const updated = payload.new as Room;
+        }, async () => {
+          // Re-fetch the full room row — postgres_changes payload may be incomplete
+          // if REPLICA IDENTITY FULL is not set on the table.
+          const { data: updated } = await supabase
+            .from("rooms").select("*").eq("id", r.id).single();
+          if (!updated) return;
           setRoom(updated);
           roomRef.current = updated;
-          // Non-host: when host starts, load the queue from the room row
           if (!host && updated.status === "active" && updated.queue_imdb_ids?.length) {
             await loadFilmsFromRoom(updated);
           }
+        })
+        .on("broadcast", { event: "start" }, async () => {
+          // Primary trigger: host broadcasts "start" once the queue is ready.
+          // Non-host calls the queue API which returns the cached queue immediately.
+          if (host) return;
+          const res = await fetch(`/api/rooms/${code}/queue`);
+          if (!res.ok) return;
+          const data = await res.json();
+          setFilms(data.films ?? []);
+          setPhase("swiping");
+          const pid = partnerId ?? await refreshPartnerName(r.id, user.id);
+          if (pid) loadExistingMatches(pid);
         })
         .on("broadcast", { event: "swipe" }, ({ payload }) => {
           if (payload.user_id === user.id) return;
@@ -209,12 +224,16 @@ export default function LiveRoomPage() {
     const tags = [...Array.from(selectedGenres), ...Array.from(selectedSpecial)];
     await supabase.from("rooms").update({ mood_tags: tags }).eq("id", room.id);
 
-    // Host generates the queue (stored on room row, which triggers non-host via realtime)
+    // Host generates the queue — stored on the room row so non-host can fetch it.
     const res = await fetch(`/api/rooms/${code}/queue`);
     const data = await res.json();
     setFilms(data.films ?? []);
     setPhase("swiping");
     setStarting(false);
+
+    // Broadcast "start" so the non-host knows to load the queue immediately
+    // (more reliable than waiting for the postgres_changes UPDATE payload).
+    channelRef.current?.send({ type: "broadcast", event: "start", payload: {} });
 
     if (partnerId) loadExistingMatches(partnerId);
   }

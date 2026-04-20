@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import FilmModal, { type ModalFilm } from "@/components/FilmModal";
+import WatchedModal, { type WatchedModalFilm } from "@/components/WatchedModal";
 
 type Tab = "shortlist" | "liked" | "passed" | "matches" | "watched";
 
@@ -39,20 +40,24 @@ interface SearchResult {
 
 // ── Grid card ─────────────────────────────────────────────────────────────────
 function GridCard({
-  item, canShortlist, canRemove, shortlisted,
-  onOpen, onShortlist, onRemove,
+  item, canShortlist, canRemove, canWatch, shortlisted, watchedIds,
+  onOpen, onShortlist, onRemove, onWatch,
 }: {
   item:         FilmCell;
   canShortlist: boolean;
   canRemove:    boolean;
+  canWatch:     boolean;
   shortlisted:  Set<string>;
+  watchedIds:   Set<string>;
   onOpen:       (item: FilmCell) => void;
   onShortlist:  (item: FilmCell) => void;
   onRemove:     (item: FilmCell) => void;
+  onWatch:      (item: FilmCell) => void;
 }) {
-  const rating     = item.tmdbRating ?? 0;
-  const genres     = item.genres ?? [];
+  const rating        = item.tmdbRating ?? 0;
+  const genres        = item.genres ?? [];
   const isShortlisted = shortlisted.has(item.id);
+  const isWatched     = watchedIds.has(item.id);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -166,6 +171,24 @@ function GridCard({
             {isShortlisted ? "★" : "+ List"}
           </button>
         )}
+        {canWatch && (
+          <button
+            onClick={() => !isWatched && onWatch(item)}
+            title={isWatched ? "Watched" : "Mark as Watched"}
+            style={{
+              width: 28,
+              background: isWatched ? "#0e1a0e" : "transparent",
+              border: `1px solid ${isWatched ? "#4a7c4a40" : "rgba(245,241,234,0.06)"}`,
+              color: isWatched ? "#6aaa6a" : "#3a3a3a",
+              fontFamily: "var(--font-mono)", fontSize: 12,
+              padding: "5px 0",
+              cursor: isWatched ? "default" : "pointer",
+              borderRadius: 2, transition: "all 0.15s",
+            }}
+          >
+            {isWatched ? "✓" : "○"}
+          </button>
+        )}
         {canRemove && (
           <button
             onClick={() => onRemove(item)}
@@ -195,6 +218,8 @@ export default function ListsPage() {
   const [items, setItems]                 = useState<FilmCell[]>([]);
   const [loading, setLoading]             = useState(false);
   const [shortlisted, setShortlisted]     = useState<Set<string>>(new Set());
+  const [watchedIds, setWatchedIds]       = useState<Set<string>>(new Set());
+  const [watchedModal, setWatchedModal]   = useState<WatchedModalFilm | null>(null);
   const [modalFilm, setModalFilm]         = useState<ModalFilm | null>(null);
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -290,8 +315,12 @@ export default function ListsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       userRef.current = user.id;
-      const { data } = await supabase.from("shortlist").select("imdb_id").eq("user_id", user.id);
-      setShortlisted(new Set((data ?? []).map((r: any) => r.imdb_id)));
+      const [{ data: slData }, { data: wData }] = await Promise.all([
+        supabase.from("shortlist").select("imdb_id").eq("user_id", user.id),
+        supabase.from("watched").select("imdb_id").eq("user_id", user.id),
+      ]);
+      setShortlisted(new Set((slData ?? []).map((r: any) => r.imdb_id)));
+      setWatchedIds(new Set((wData ?? []).map((r: any) => r.imdb_id)));
     })();
   }, []);
 
@@ -402,6 +431,29 @@ export default function ListsPage() {
     if (res.ok) setShortlisted(prev => new Set([...prev, item.id]));
   }
 
+  function openWatchedModal(item: FilmCell) {
+    setWatchedModal({
+      id:       item.id,
+      tmdbId:   item.tmdbId,
+      title:    item.title,
+      year:     item.year,
+      posterUrl: item.posterUrl,
+    });
+  }
+
+  async function handleWatch(film: WatchedModalFilm, rating: number, review: string) {
+    if (!userRef.current) return;
+    await supabase.from("watched").upsert({
+      user_id:    userRef.current,
+      imdb_id:    film.id,
+      watched_at: new Date().toISOString(),
+      rating,
+      review:     review || null,
+    }, { onConflict: "user_id,imdb_id" });
+    setWatchedIds(prev => new Set([...prev, film.id]));
+    if (active === "watched") load("watched");
+  }
+
   function openModal(item: FilmCell) {
     setModalFilm({
       tmdbId:    item.tmdbId,
@@ -419,6 +471,7 @@ export default function ListsPage() {
 
   const canRemove    = active !== "matches";
   const canShortlist = active !== "shortlist";
+  const canWatch     = active !== "watched";
 
   return (
     <div style={{
@@ -427,6 +480,11 @@ export default function ListsPage() {
       paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string,
     }}>
       <FilmModal film={modalFilm} onClose={() => setModalFilm(null)} />
+      <WatchedModal
+        film={watchedModal}
+        onClose={() => setWatchedModal(null)}
+        onSubmit={handleWatch}
+      />
 
       {/* Header */}
       <div style={{ padding: "24px 24px 0", borderBottom: "1px solid rgba(245,241,234,0.06)", flexShrink: 0 }}>
@@ -598,10 +656,13 @@ export default function ListsPage() {
                 item={item}
                 canShortlist={canShortlist}
                 canRemove={canRemove}
+                canWatch={canWatch}
                 shortlisted={shortlisted}
+                watchedIds={watchedIds}
                 onOpen={openModal}
                 onShortlist={addToShortlist}
                 onRemove={remove}
+                onWatch={openWatchedModal}
               />
             ))}
           </div>

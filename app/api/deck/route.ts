@@ -144,8 +144,8 @@ async function fetchFilteredDiscover(
   );
 }
 
-// Popular discover: films with 5,000+ votes, sorted by vote count descending.
-// Optionally scoped to genre/special filters if also active.
+// Popular discover: mainstream/blockbuster films filtered by revenue + vote count.
+// Revenue ≥ $50M eliminates arthouse; vote_count ≥ 10k ensures broad audience reach.
 async function fetchPopularDiscover(
   genres: Genre[],
   special: Special[],
@@ -165,6 +165,7 @@ async function fetchPopularDiscover(
     genrePart,
     ...dateParts,
     "vote_count.gte=10000",
+    "with_revenue.gte=50000000",
     "sort_by=popularity.desc",
     "include_adult=false",
   ].filter(Boolean).join("&");

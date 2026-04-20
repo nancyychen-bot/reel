@@ -227,6 +227,7 @@ export default function ListsPage() {
   const [addedIds, setAddedIds]           = useState<Set<number>>(new Set());
   const [searchOpen, setSearchOpen]       = useState(false);
   const [activeGenres, setActiveGenres]   = useState<Set<string>>(new Set());
+  const [hideWatched, setHideWatched]     = useState(false);
 
   const userRef        = useRef<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -244,13 +245,17 @@ export default function ListsPage() {
     return Array.from(all).sort();
   }, [items]);
 
-  // Items filtered by selected genres
+  // Items filtered by selected genres + hide-watched toggle
   const filteredItems = useMemo(() => {
-    if (activeGenres.size === 0) return items;
-    return items.filter(item =>
+    let result = items;
+    if (active === "liked" && hideWatched) {
+      result = result.filter(item => !watchedIds.has(item.id));
+    }
+    if (activeGenres.size === 0) return result;
+    return result.filter(item =>
       (item.genres ?? []).some(g => activeGenres.has(g))
     );
-  }, [items, activeGenres]);
+  }, [items, activeGenres, active, hideWatched, watchedIds]);
 
   function toggleGenre(g: string) {
     setActiveGenres(prev => {
@@ -577,6 +582,34 @@ export default function ListsPage() {
           </div>
         )}
       </div>
+
+      {/* Hide watched toggle — Liked tab only */}
+      {active === "liked" && (
+        <div style={{ padding: "0 24px 10px", flexShrink: 0 }}>
+          <button
+            onClick={() => setHideWatched(h => !h)}
+            style={{
+              background:   hideWatched ? "#0e1a0e" : "transparent",
+              border:       `1px solid ${hideWatched ? "#4a7c4a40" : "#252525"}`,
+              borderRadius: 2,
+              padding:      "5px 12px",
+              color:        hideWatched ? "#6aaa6a" : "#3a3a3a",
+              fontFamily:   "var(--font-mono)",
+              fontSize:     10,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              cursor:       "pointer",
+              transition:   "all 0.15s ease",
+              display:      "flex",
+              alignItems:   "center",
+              gap:          6,
+            }}
+          >
+            <span>{hideWatched ? "✓" : "○"}</span>
+            Hide Watched
+          </button>
+        </div>
+      )}
 
       {/* Genre filter chips */}
       {availableGenres.length > 0 && (

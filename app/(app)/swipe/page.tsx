@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SwipeDeck from "@/components/SwipeDeck";
 import MatchModal, { type MatchFilm } from "@/components/MatchModal";
 import FilterPanel from "@/components/FilterPanel";
@@ -17,6 +17,10 @@ export default function SwipePage() {
   const [page, setPage]       = useState(1);
   const [match, setMatch]     = useState<MatchFilm | null>(null);
   const [showHint, setShowHint] = useState(false);
+
+  // Client-side record of every tmdbId swiped this session — used to
+  // deduplicate incoming batches before DB swipes are fully committed.
+  const swipedIds = useRef(new Set<number>());
 
   // Show first-time hint
   useEffect(() => {
@@ -49,7 +53,8 @@ export default function SwipePage() {
     fetch(`/api/deck?${params}`)
       .then(r => r.json())
       .then(data => {
-        setFilms(prev => page === 1 ? (data.films ?? []) : [...prev, ...(data.films ?? [])]);
+        const incoming = (data.films ?? []).filter((f: FilmData) => !swipedIds.current.has(f.tmdbId));
+        setFilms(prev => page === 1 ? incoming : [...prev, ...incoming]);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -83,6 +88,7 @@ export default function SwipePage() {
   }, []);
 
   const handleSwipe = useCallback(async (tmdbId: number, direction: "like" | "pass", film: FilmData) => {
+    swipedIds.current.add(tmdbId);
     const res = await fetch("/api/swipe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -105,7 +111,7 @@ export default function SwipePage() {
   }, []);
 
   function toggleGenre(g: Genre) {
-    setPage(1); setFilms([]);
+    setPage(1); setFilms([]); swipedIds.current.clear();
     setGenres(prev => {
       const next = new Set(prev);
       next.has(g) ? next.delete(g) : next.add(g);
@@ -115,7 +121,7 @@ export default function SwipePage() {
   }
 
   function toggleSpecial(s: Special) {
-    setPage(1); setFilms([]);
+    setPage(1); setFilms([]); swipedIds.current.clear();
     setSpecial(prev => {
       const next = new Set(prev);
       next.has(s) ? next.delete(s) : next.add(s);
@@ -125,7 +131,7 @@ export default function SwipePage() {
   }
 
   function clearFilters() {
-    setPage(1); setFilms([]);
+    setPage(1); setFilms([]); swipedIds.current.clear();
     setGenres(new Set()); setSpecial(new Set());
     sessionStorage.removeItem("reel_genres");
     sessionStorage.removeItem("reel_special");

@@ -260,7 +260,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Build filter-aware DB query ──────────────────────────────────────────
-  const MOVIE_SELECT = "tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating";
+  const MOVIE_SELECT = "tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating, ebert_great_movie";
 
   // Swipe lookup: resolve real imdb_ids (tt...) → tmdb_id via movies table.
   // No slice limit — a user can have thousands of swipes.
@@ -318,9 +318,14 @@ export async function GET(request: NextRequest) {
     .map((m: any) => m.tmdb_id)
     .slice(0, 20);
 
-  // DB films
+  // DB films — Ebert Great Movies get the highest boost (list_count 4),
+  // other prestige films get 3, rest get 0.
   const dbFilms: FilmRecord[] = dbPool
-    .map((f: any) => tmdbResultToFilm(f, PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 0));
+    .map((f: any) => tmdbResultToFilm(
+      f,
+      f.ebert_great_movie  ? 4 :
+      PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 0
+    ));
   const dbIds = new Set(dbFilms.map(f => f.tmdb_id));
 
   // ── Discover pool ────────────────────────────────────────────────────────

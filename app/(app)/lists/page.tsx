@@ -520,15 +520,41 @@ export default function ListsPage() {
       {/* Search / Add films */}
       <div style={{ padding: "12px 24px 0", flexShrink: 0 }}>
         {!searchOpen ? (
-          <button onClick={() => setSearchOpen(true)} style={{
-            background: "none", border: "1px solid rgba(245,241,234,0.08)",
-            color: "#5A5550", fontFamily: "var(--font-mono)", fontSize: 10,
-            letterSpacing: "0.12em", textTransform: "uppercase",
-            padding: "7px 14px", borderRadius: 2, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 6, marginBottom: 12,
-          }}>
-            + Add a film
-          </button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <button onClick={() => setSearchOpen(true)} style={{
+              background: "none", border: "1px solid rgba(245,241,234,0.08)",
+              color: "#5A5550", fontFamily: "var(--font-mono)", fontSize: 10,
+              letterSpacing: "0.12em", textTransform: "uppercase",
+              padding: "7px 14px", borderRadius: 2, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              + Add a film
+            </button>
+            {active === "liked" && (
+              <button
+                onClick={() => setHideWatched(h => !h)}
+                style={{
+                  background:    hideWatched ? "#0e1a0e" : "transparent",
+                  border:        `1px solid ${hideWatched ? "#4a7c4a40" : "#252525"}`,
+                  borderRadius:  2,
+                  padding:       "7px 12px",
+                  color:         hideWatched ? "#6aaa6a" : "#3a3a3a",
+                  fontFamily:    "var(--font-mono)",
+                  fontSize:      10,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  cursor:        "pointer",
+                  transition:    "all 0.15s ease",
+                  display:       "flex",
+                  alignItems:    "center",
+                  gap:           6,
+                }}
+              >
+                <span>{hideWatched ? "✓" : "○"}</span>
+                Hide Watched
+              </button>
+            )}
+          </div>
         ) : (
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -582,34 +608,6 @@ export default function ListsPage() {
           </div>
         )}
       </div>
-
-      {/* Hide watched toggle — Liked tab only */}
-      {active === "liked" && (
-        <div style={{ padding: "0 24px 10px", flexShrink: 0 }}>
-          <button
-            onClick={() => setHideWatched(h => !h)}
-            style={{
-              background:   hideWatched ? "#0e1a0e" : "transparent",
-              border:       `1px solid ${hideWatched ? "#4a7c4a40" : "#252525"}`,
-              borderRadius: 2,
-              padding:      "5px 12px",
-              color:        hideWatched ? "#6aaa6a" : "#3a3a3a",
-              fontFamily:   "var(--font-mono)",
-              fontSize:     10,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor:       "pointer",
-              transition:   "all 0.15s ease",
-              display:      "flex",
-              alignItems:   "center",
-              gap:          6,
-            }}
-          >
-            <span>{hideWatched ? "✓" : "○"}</span>
-            Hide Watched
-          </button>
-        </div>
-      )}
 
       {/* Genre filter chips */}
       {availableGenres.length > 0 && (

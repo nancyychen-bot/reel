@@ -220,7 +220,10 @@ export default function ListsPage() {
   const [shortlisted, setShortlisted]     = useState<Set<string>>(new Set());
   const [watchedIds, setWatchedIds]       = useState<Set<string>>(new Set());
   const [watchedModal, setWatchedModal]   = useState<WatchedModalFilm | null>(null);
+  const [selectedSearchFilm, setSelectedSearchFilm] = useState<SearchResult | null>(null);
   const [modalFilm, setModalFilm]         = useState<ModalFilm | null>(null);
+  // Holds the correct submit handler depending on where WatchedModal was opened from
+  const watchedOnSubmitRef = useRef<(film: WatchedModalFilm, rating: number, review: string) => Promise<void>>(async () => {});
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -429,13 +432,46 @@ export default function ListsPage() {
   }
 
   function openWatchedModal(item: FilmCell) {
+    watchedOnSubmitRef.current = handleWatch;
     setWatchedModal({
-      id:       item.id,
-      tmdbId:   item.tmdbId,
-      title:    item.title,
-      year:     item.year,
+      id:        item.id,
+      tmdbId:    item.tmdbId,
+      title:     item.title,
+      year:      item.year,
       posterUrl: item.posterUrl,
     });
+  }
+
+  function openWatchedFromSearch(film: SearchResult) {
+    setSelectedSearchFilm(null);
+    watchedOnSubmitRef.current = handleWatchFromSearch;
+    setWatchedModal({
+      id:        String(film.id),
+      tmdbId:    film.id,
+      title:     film.title,
+      year:      film.year,
+      posterUrl: film.posterUrl,
+    });
+  }
+
+  async function handleWatchFromSearch(film: WatchedModalFilm, rating: number, review: string) {
+    const res = await fetch("/api/watched", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tmdbId: film.tmdbId,
+        film:   { title: film.title, year: film.year, posterUrl: film.posterUrl },
+        rating,
+        review: review || null,
+      }),
+    });
+    if (!res.ok) return;
+    const { imdbId } = await res.json();
+    if (imdbId) {
+      setWatchedIds(prev => new Set([...prev, imdbId]));
+      setAddedIds(prev => new Set([...prev, film.tmdbId!]));
+    }
+    if (active === "watched") load("watched");
   }
 
   async function handleWatch(film: WatchedModalFilm, rating: number, review: string) {
@@ -480,8 +516,101 @@ export default function ListsPage() {
       <WatchedModal
         film={watchedModal}
         onClose={() => setWatchedModal(null)}
-        onSubmit={handleWatch}
+        onSubmit={(film, rating, review) => watchedOnSubmitRef.current(film, rating, review)}
       />
+
+      {/* Search film action modal */}
+      {selectedSearchFilm && (
+        <>
+          <div
+            onClick={() => setSelectedSearchFilm(null)}
+            style={{
+              position: "fixed", inset: 0, zIndex: 300,
+              background: "rgba(0,0,0,0.7)",
+              backdropFilter: "blur(6px)",
+            }}
+          />
+          <div style={{
+            position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 301,
+            background: "#0e0e0e",
+            borderTop: "1px solid #1e1e1e",
+            borderRadius: "12px 12px 0 0",
+            padding: "24px 24px 40px",
+            display: "flex", flexDirection: "column", gap: 20,
+          }}>
+            <div style={{ width: 32, height: 3, borderRadius: 2, background: "#252525", margin: "0 auto" }} />
+
+            {/* Film info */}
+            <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+              {selectedSearchFilm.posterUrl && (
+                <img
+                  src={selectedSearchFilm.posterUrl} alt={selectedSearchFilm.title}
+                  style={{ width: 52, height: 78, objectFit: "cover", borderRadius: 2, flexShrink: 0 }}
+                />
+              )}
+              <div>
+                <div style={{ fontFamily: "var(--font-serif)", fontSize: 18, fontStyle: "italic", color: "#F5F1EA", lineHeight: 1.2, marginBottom: 4 }}>
+                  {selectedSearchFilm.title}
+                </div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#5A5550" }}>
+                  {selectedSearchFilm.year > 0 ? selectedSearchFilm.year : ""}
+                </div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {addedIds.has(selectedSearchFilm.id) ? (
+                <div style={{
+                  fontFamily: "var(--font-mono)", fontSize: 11, color: "#C9A961",
+                  letterSpacing: "0.12em", textAlign: "center", padding: "10px",
+                }}>
+                  Added ✓
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => { addFilm(selectedSearchFilm, "like"); setSelectedSearchFilm(null); }}
+                    style={{
+                      width: "100%", background: "transparent",
+                      border: "1px solid rgba(245,241,234,0.1)",
+                      color: "#F5F1EA", fontFamily: "var(--font-mono)",
+                      fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase",
+                      padding: "13px", borderRadius: 2, cursor: "pointer",
+                    }}
+                  >
+                    Add to Liked
+                  </button>
+                  <button
+                    onClick={() => { addFilm(selectedSearchFilm, "shortlist"); setSelectedSearchFilm(null); }}
+                    style={{
+                      width: "100%", background: "transparent",
+                      border: "1px solid rgba(245,241,234,0.1)",
+                      color: "#C9A961", fontFamily: "var(--font-mono)",
+                      fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase",
+                      padding: "13px", borderRadius: 2, cursor: "pointer",
+                    }}
+                  >
+                    Add to Shortlist
+                  </button>
+                  <button
+                    onClick={() => openWatchedFromSearch(selectedSearchFilm)}
+                    style={{
+                      width: "100%", background: "transparent",
+                      border: "1px solid rgba(245,241,234,0.06)",
+                      color: "#6aaa6a", fontFamily: "var(--font-mono)",
+                      fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase",
+                      padding: "13px", borderRadius: 2, cursor: "pointer",
+                    }}
+                  >
+                    Mark as Watched
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Header */}
       <div style={{ padding: "24px 24px 0", borderBottom: "1px solid rgba(245,241,234,0.06)", flexShrink: 0 }}>
@@ -571,11 +700,15 @@ export default function ListsPage() {
             {!searchLoading && searchResults.length > 0 && (
               <div style={{ marginTop: 4, border: "1px solid rgba(245,241,234,0.06)", borderRadius: 2, overflow: "hidden" }}>
                 {searchResults.map(film => (
-                  <div key={film.id} style={{
-                    display: "flex", alignItems: "center", gap: 12,
-                    padding: "10px 12px", borderBottom: "1px solid rgba(245,241,234,0.04)",
-                    background: "#0D0D0D",
-                  }}>
+                  <div
+                    key={film.id}
+                    onClick={() => setSelectedSearchFilm(film)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "10px 12px", borderBottom: "1px solid rgba(245,241,234,0.04)",
+                      background: "#0D0D0D", cursor: "pointer",
+                    }}
+                  >
                     {film.posterUrl && (
                       <img src={film.posterUrl} alt="" style={{ width: 28, height: 42, objectFit: "cover", borderRadius: 1, flexShrink: 0 }} />
                     )}
@@ -583,16 +716,11 @@ export default function ListsPage() {
                       <div style={{ fontFamily: "var(--font-sans)", fontSize: 12, color: "#F5F1EA", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{film.title}</div>
                       {film.year > 0 && <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#5A5550" }}>{film.year}</div>}
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                      {addedIds.has(film.id) ? (
-                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#C9A961", letterSpacing: "0.1em" }}>Added</span>
-                      ) : (
-                        <>
-                          <button onClick={() => addFilm(film, "like")} style={{ background: "none", border: "1px solid rgba(245,241,234,0.08)", color: "#5A5550", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", padding: "4px 8px", borderRadius: 2, cursor: "pointer" }}>Like</button>
-                          <button onClick={() => addFilm(film, "shortlist")} style={{ background: "none", border: "1px solid rgba(245,241,234,0.08)", color: "#C9A961", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", padding: "4px 8px", borderRadius: 2, cursor: "pointer" }}>+ List</button>
-                        </>
-                      )}
-                    </div>
+                    {addedIds.has(film.id) ? (
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#C9A961", letterSpacing: "0.1em", flexShrink: 0 }}>Added ✓</span>
+                    ) : (
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", flexShrink: 0 }}>›</span>
+                    )}
                   </div>
                 ))}
               </div>

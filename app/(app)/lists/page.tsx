@@ -20,6 +20,7 @@ interface FilmCell {
   genres?:     string[];
   plot?:       string;
   tmdbRating?: number;
+  userRating?: number;   // star rating the user gave (watched tab only)
 }
 
 const TABS: { key: Tab; label: string }[] = [
@@ -115,6 +116,15 @@ function GridCard({
       }} onClick={() => onOpen(item)}>
         {item.title}
       </div>
+
+      {/* User star rating */}
+      {item.userRating != null && item.userRating > 0 && (
+        <div style={{ marginBottom: 3 }}>
+          {Array.from({ length: 5 }, (_, i) => (
+            <span key={i} style={{ fontSize: 10, color: i < item.userRating! ? "#C9A961" : "#252525" }}>★</span>
+          ))}
+        </div>
+      )}
 
       {/* Year · Runtime */}
       <div style={{
@@ -229,15 +239,16 @@ export default function ListsPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [addedIds, setAddedIds]           = useState<Set<number>>(new Set());
   const [searchOpen, setSearchOpen]       = useState(false);
-  const [activeGenres, setActiveGenres]   = useState<Set<string>>(new Set());
-  const [hideWatched, setHideWatched]     = useState(false);
+  const [activeGenres, setActiveGenres]       = useState<Set<string>>(new Set());
+  const [hideWatched, setHideWatched]         = useState(false);
+  const [watchedRatingFilter, setWatchedRatingFilter] = useState<number | null>(null);
 
   const userRef        = useRef<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const supabase       = createClient();
 
-  // Reset genre filters when switching tabs
-  useEffect(() => { setActiveGenres(new Set()); }, [active]);
+  // Reset filters when switching tabs
+  useEffect(() => { setActiveGenres(new Set()); setWatchedRatingFilter(null); }, [active]);
 
   // All unique genres in the current tab's films
   const availableGenres = useMemo(() => {
@@ -248,17 +259,20 @@ export default function ListsPage() {
     return Array.from(all).sort();
   }, [items]);
 
-  // Items filtered by selected genres + hide-watched toggle
+  // Items filtered by selected genres + hide-watched + star rating
   const filteredItems = useMemo(() => {
     let result = items;
     if (active === "liked" && hideWatched) {
       result = result.filter(item => !watchedIds.has(item.id));
     }
+    if (active === "watched" && watchedRatingFilter !== null) {
+      result = result.filter(item => item.userRating === watchedRatingFilter);
+    }
     if (activeGenres.size === 0) return result;
     return result.filter(item =>
       (item.genres ?? []).some(g => activeGenres.has(g))
     );
-  }, [items, activeGenres, active, hideWatched, watchedIds]);
+  }, [items, activeGenres, active, hideWatched, watchedIds, watchedRatingFilter]);
 
   function toggleGenre(g: string) {
     setActiveGenres(prev => {
@@ -399,10 +413,10 @@ export default function ListsPage() {
 
     if (tab === "watched") {
       const { data: rows } = await supabase
-        .from("watched").select("imdb_id, watched_at").eq("user_id", user.id)
+        .from("watched").select("imdb_id, watched_at, rating").eq("user_id", user.id)
         .order("watched_at", { ascending: false });
       const movies = await fetchMovies((rows ?? []).map((r: any) => r.imdb_id));
-      setItems((rows ?? []).map((r: any) => mapMovie(r, movies, "watched_at")));
+      setItems((rows ?? []).map((r: any) => ({ ...mapMovie(r, movies, "watched_at"), userRating: r.rating ?? undefined })));
     }
 
     setLoading(false);
@@ -674,6 +688,30 @@ export default function ListsPage() {
                 <span>{hideWatched ? "✓" : "○"}</span>
                 Hide Watched
               </button>
+            )}
+            {active === "watched" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setWatchedRatingFilter(watchedRatingFilter === n ? null : n)}
+                    title={`${n} star${n > 1 ? "s" : ""}`}
+                    style={{
+                      background:   watchedRatingFilter === n ? "#1c1308" : "transparent",
+                      border:       `1px solid ${watchedRatingFilter === n ? "#C9A96150" : "#1e1e1e"}`,
+                      borderRadius: 2,
+                      padding:      "5px 7px",
+                      cursor:       "pointer",
+                      lineHeight:   1,
+                      transition:   "all 0.15s ease",
+                    }}
+                  >
+                    {Array.from({ length: n }, (_, i) => (
+                      <span key={i} style={{ fontSize: 9, color: watchedRatingFilter === n ? "#C9A961" : "#3a3a3a" }}>★</span>
+                    ))}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         ) : (

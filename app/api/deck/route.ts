@@ -14,13 +14,25 @@ const GENRE_MAP: Record<number, string> = {
   53: "Thriller", 10752: "War", 37: "Western",
 };
 
-function tmdbResultToFilm(f: any, listCount = 0): FilmRecord {
+// Reverse map: genre name → TMDB genre ID (for discover queries)
+const GENRE_TO_TMDB: Record<string, number> = Object.fromEntries(
+  Object.entries(GENRE_MAP).map(([id, name]) => [name, Number(id)])
+);
+
+const CURRENT_YEAR = new Date().getFullYear();
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function tmdbResultToFilm(f: any, listCount = 0, syntheticRuntime?: number): FilmRecord {
   return {
-    tmdb_id:     f.id,
+    tmdb_id:     f.id ?? f.tmdb_id,
     imdb_id:     f.imdb_id ?? "",
     title:       f.title,
-    year:        parseInt(f.release_date?.slice(0, 4) ?? "0"),
-    runtime:     f.runtime_minutes ?? f.runtime ?? 0,
+    year:        parseInt(f.release_date?.slice(0, 4) ?? String(f.year ?? 0)),
+    // DB films use runtime_minutes; TMDB search results have no runtime.
+    // syntheticRuntime is set when we fetched from a TMDB discover query that
+    // already filtered by runtime, so we know the value is in range.
+    runtime:     syntheticRuntime ?? f.runtime_minutes ?? f.runtime ?? 0,
     genres:      Array.isArray(f.genres)
                    ? f.genres
                    : (f.genre_ids ?? []).map((id: number) => GENRE_MAP[id]).filter(Boolean),
@@ -34,54 +46,92 @@ function tmdbResultToFilm(f: any, listCount = 0): FilmRecord {
   };
 }
 
-// Fetch TMDB recommendations for a set of films the user has liked.
-// Returns films not already in the pool, scored with list_count=2
-// (treated as "recommended for you" — boosts them in the ranker).
+// Personalised recommendations based on films the user has already liked.
 async function fetchRecommendations(
   likedTmdbIds: number[],
   excludeIds: Set<number>,
 ): Promise<FilmRecord[]> {
   if (!TMDB_KEY || likedTmdbIds.length === 0) return [];
-
   const results = await Promise.all(
     likedTmdbIds.slice(0, 8).map(id =>
       fetch(
         `https://api.themoviedb.org/3/movie/${id}/recommendations?api_key=${TMDB_KEY}&language=en-US&page=1`
-      )
-        .then(r => r.json())
-        .catch(() => ({ results: [] }))
+      ).then(r => r.json()).catch(() => ({ results: [] }))
     )
   );
-
   const seen = new Set<number>(excludeIds);
   return results.flatMap((p: any) =>
     (p.results ?? [])
       .filter((f: any) => f.poster_path && f.title && !seen.has(f.id) && seen.add(f.id))
-      .map((f: any) => tmdbResultToFilm(f, 2)) // list_count=2 → +1 score bonus
+      .map((f: any) => tmdbResultToFilm(f, 2))
   );
 }
 
-// Broader TMDB discover pool — fills gaps when the user has swiped through
-// most of the DB or when they have no liked films yet.
-async function fetchDiscoverPool(pages = 15, offset = 0): Promise<FilmRecord[]> {
+// Build TMDB discover queries that respect the active genre / special filters.
+// Returns an array of query-param strings (one per discover batch).
+function buildDiscoverParamSets(genres: Genre[], special: Special[]): string[] {
+  const genrePart = genres.length > 0
+    ? `with_genres=${genres.map(g => GENRE_TO_TMDB[g]).filter(Boolean).join("|")}`
+    : "";
+
+  // Specials that need a date constraint
+  const dateFilters: string[] = [];
+  if (special.includes("Classic")) dateFilters.push("primary_release_date.lte=1979-12-31");
+  if (special.includes("Recent"))  dateFilters.push(`primary_release_date.gte=${CURRENT_YEAR - 3}-01-01`);
+
+  // Specials that need a runtime constraint
+  const runtimeFilters: string[] = [];
+  if (special.includes("Short")) runtimeFilters.push("with_runtime.lte=99&with_runtime.gte=20");
+  if (special.includes("Epic"))  runtimeFilters.push("with_runtime.gte=150");
+
+  // Build the Cartesian product of date × runtime filters (or "no constraint" if empty)
+  const dateOptions   = dateFilters.length   > 0 ? dateFilters   : [""];
+  const runtimeOptions = runtimeFilters.length > 0 ? runtimeFilters : [""];
+
+  const paramSets: string[] = [];
+  for (const date of dateOptions) {
+    for (const runtime of runtimeOptions) {
+      const parts = [
+        genrePart,
+        date,
+        runtime,
+        "sort_by=vote_average.desc",
+        "vote_count.gte=200",
+        "include_adult=false",
+      ].filter(Boolean);
+      paramSets.push(parts.join("&"));
+    }
+  }
+
+  return paramSets;
+}
+
+// Synthetic runtime values passed to films fetched via a runtime-filtered
+// discover query (the TMDB results don't include runtime in the payload,
+// but we know they satisfy the constraint we asked for).
+function syntheticRuntimeFor(special: Special[]): number | undefined {
+  if (special.includes("Short")) return 80;  // representative short-film length
+  if (special.includes("Epic"))  return 170; // representative epic length
+  return undefined;
+}
+
+async function fetchFilteredDiscover(
+  genres: Genre[],
+  special: Special[],
+  pages = 10,
+): Promise<FilmRecord[]> {
   if (!TMDB_KEY) return [];
 
-  // Multiple quality tiers fetched in parallel
-  const queries = [
-    `sort_by=vote_average.desc&vote_count.gte=10000&vote_average.gte=7.0`,
-    `sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.5&primary_release_date.lte=1980-12-31`,
-    `sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.3&with_original_language=ja|fr|it|ko|de|ru|es|zh`,
-  ];
+  const paramSets = buildDiscoverParamSets(genres, special);
+  const synRuntime = syntheticRuntimeFor(special);
+  const pagesPerSet = Math.max(1, Math.ceil(pages / paramSets.length));
 
-  const pageOffset = Math.floor(offset / 20); // rotate starting page for variety
   const results = await Promise.all(
-    queries.flatMap(params =>
-      Array.from({ length: Math.ceil(pages / queries.length) }, (_, i) =>
+    paramSets.flatMap(params =>
+      Array.from({ length: pagesPerSet }, (_, i) =>
         fetch(
-          `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&include_adult=false&${params}&page=${(pageOffset + i) % 500 + 1}`
-        )
-          .then(r => r.json())
-          .catch(() => ({ results: [] }))
+          `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&${params}&page=${i + 1}`
+        ).then(r => r.json()).catch(() => ({ results: [] }))
       )
     )
   );
@@ -90,30 +140,62 @@ async function fetchDiscoverPool(pages = 15, offset = 0): Promise<FilmRecord[]> 
   return results.flatMap((p: any) =>
     (p.results ?? [])
       .filter((f: any) => f.poster_path && f.title && !seen.has(f.id) && seen.add(f.id))
+      .map((f: any) => tmdbResultToFilm(f, 0, synRuntime))
+  );
+}
+
+// Broad fallback discover pool (no filter constraints) — used when no filters
+// are active and the DB is thin.
+async function fetchBroadDiscover(pages = 15, pageOffset = 0): Promise<FilmRecord[]> {
+  if (!TMDB_KEY) return [];
+  const queries = [
+    `sort_by=vote_average.desc&vote_count.gte=10000&vote_average.gte=7.0`,
+    `sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.5&primary_release_date.lte=1980-12-31`,
+    `sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.3&with_original_language=ja|fr|it|ko|de|ru|es|zh`,
+  ];
+  const off = Math.floor(pageOffset / 20);
+  const results = await Promise.all(
+    queries.flatMap(params =>
+      Array.from({ length: Math.ceil(pages / queries.length) }, (_, i) =>
+        fetch(
+          `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&include_adult=false&${params}&page=${(off + i) % 500 + 1}`
+        ).then(r => r.json()).catch(() => ({ results: [] }))
+      )
+    )
+  );
+  const seen = new Set<number>();
+  return results.flatMap((p: any) =>
+    (p.results ?? [])
+      .filter((f: any) => f.poster_path && f.title && !seen.has(f.id) && seen.add(f.id))
       .map((f: any) => tmdbResultToFilm(f))
   );
 }
 
+// ── route ─────────────────────────────────────────────────────────────────────
+
 export async function GET(request: NextRequest) {
-  const genresParam  = request.nextUrl.searchParams.get("genres") ?? "";
+  const genresParam  = request.nextUrl.searchParams.get("genres")  ?? "";
   const specialParam = request.nextUrl.searchParams.get("special") ?? "";
   const genres  = genresParam  ? (genresParam.split(",")  as Genre[])   : [];
   const special = specialParam ? (specialParam.split(",") as Special[]) : [];
   const page    = parseInt(request.nextUrl.searchParams.get("page") ?? "1");
 
+  const wantsArthouse    = special.includes("Art House");
+  const filteredSpecial  = special.filter(s => s !== "Art House") as Special[];
+  const hasFilters       = genres.length > 0 || filteredSpecial.length > 0;
+  const hasRuntimeFilter = filteredSpecial.some(s => s === "Short" || s === "Epic");
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Fetch prefs + full swipe history in parallel
+  // Swipe history + prefs
   const [{ data: prefs }, { data: swipes }] = await Promise.all([
-    supabase
-      .from("user_preferences")
+    supabase.from("user_preferences")
       .select("preferred_genres, favorite_film_tmdb_ids")
       .eq("user_id", user.id)
       .maybeSingle(),
-    supabase
-      .from("swipes")
+    supabase.from("swipes")
       .select("imdb_id, direction")
       .eq("user_id", user.id),
   ]);
@@ -121,49 +203,87 @@ export async function GET(request: NextRequest) {
   const allSwipedImdbIds = (swipes ?? []).map((s: any) => s.imdb_id).filter(Boolean);
   const likedImdbSet     = new Set((swipes ?? []).filter((s: any) => s.direction === "like").map((s: any) => s.imdb_id));
 
-  // Fetch swiped tmdb_ids + DB pool in parallel.
-  // IMDb IDs like "tt0068646" can't be parsed as numbers — we must look them up.
-  // Every swiped film is in movies (the swipe route upserts it), so this covers all cases.
-  const [{ data: swipedMoviesData }, { data: dbPool }] = await Promise.all([
-    allSwipedImdbIds.length > 0
-      ? supabase
-          .from("movies")
-          .select("tmdb_id, imdb_id")
-          .in("imdb_id", allSwipedImdbIds.slice(0, 1000))
-      : Promise.resolve({ data: [] as any[] }),
-    supabase
-      .from("movies")
-      .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
-      .order("tmdb_rating", { ascending: false })
-      .limit(500),
-  ]);
+  // ── Build filter-aware DB query ──────────────────────────────────────────
+  const MOVIE_SELECT = "tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating";
 
-  // Build swipedIds from real tmdb_ids (plus numeric fallback for placeholder imdb_ids)
+  // Swipe lookup runs in parallel with everything else
+  const swipedMoviesPromise = allSwipedImdbIds.length > 0
+    ? supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", allSwipedImdbIds.slice(0, 1000))
+    : Promise.resolve({ data: [] as any[] });
+
+  let dbPool: any[] = [];
+  let arthouseIds: Set<number> | null = null;
+
+  if (wantsArthouse) {
+    // For Art House: fetch arthouse IDs first, then query movies for exactly those IDs.
+    // This guarantees we pull ALL seeded arthouse films rather than hoping they fall
+    // within the top-N by rating from the entire movies table.
+    const { data: af } = await supabase.from("arthouse_films").select("tmdb_id");
+    const afIds = (af ?? []).map((r: any) => r.tmdb_id as number);
+    arthouseIds = new Set(afIds);
+
+    if (afIds.length > 0) {
+      const { data } = await supabase
+        .from("movies")
+        .select(MOVIE_SELECT)
+        .in("tmdb_id", afIds)
+        .order("tmdb_rating", { ascending: false });
+      dbPool = data ?? [];
+    }
+  } else {
+    // Standard path: filter-aware query against the full movies table.
+    // Genre and year filters applied at DB level for a dense pool.
+    // Runtime filters (Short/Epic) rely on post-hoc matchesFilters because
+    // runtime_minutes is often null for non-seeded films; discover compensates.
+    let q = supabase
+      .from("movies")
+      .select(MOVIE_SELECT)
+      .order("tmdb_rating", { ascending: false })
+      .limit(hasRuntimeFilter ? 2000 : 600);
+
+    if (genres.length > 0)                   q = (q as any).overlaps("genres", genres);
+    if (filteredSpecial.includes("Classic"))  q = (q as any).lt("year", 1980).gt("year", 0);
+    if (filteredSpecial.includes("Recent"))   q = (q as any).gte("year", CURRENT_YEAR - 3);
+
+    const { data } = await q;
+    dbPool = data ?? [];
+  }
+
+  const { data: swipedMoviesData } = await swipedMoviesPromise;
+
+  // Build swipedIds
   const swipedIds = new Set<number>();
   (swipedMoviesData ?? []).forEach((m: any) => swipedIds.add(m.tmdb_id));
   allSwipedImdbIds.forEach((id: string) => { const n = parseInt(id); if (!isNaN(n)) swipedIds.add(n); });
 
-  // Liked tmdb_ids for personalised recommendations
   const likedTmdbIds: number[] = (swipedMoviesData ?? [])
     .filter((m: any) => likedImdbSet.has(m.imdb_id))
     .map((m: any) => m.tmdb_id)
     .slice(0, 20);
 
-  const dbFilms: FilmRecord[] = (dbPool ?? []).map((f: any) =>
-    tmdbResultToFilm(f, PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 0)
-  );
+  // DB films
+  const dbFilms: FilmRecord[] = dbPool
+    .map((f: any) => tmdbResultToFilm(f, PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 0));
   const dbIds = new Set(dbFilms.map(f => f.tmdb_id));
 
-  // Fetch personalised recs + broader discover in parallel
+  // ── Discover pool ────────────────────────────────────────────────────────
+  // Always run a filter-aware discover pool when filters are active.
+  // For Art House we rely entirely on the DB (arthouse_films).
+  // For broad unfiltered browsing, only run discover when DB is thin or on later pages.
   const [recFilms, discoverFilms] = await Promise.all([
     fetchRecommendations(likedTmdbIds, new Set([...swipedIds, ...dbIds])),
-    // Only hit discover if DB is thin or user is on later pages
-    (dbFilms.length < 100 || page > 3)
-      ? fetchDiscoverPool(15, (page - 1) * 60)
-      : Promise.resolve([] as FilmRecord[]),
+    (() => {
+      if (wantsArthouse) return Promise.resolve([] as FilmRecord[]);
+      if (hasFilters)    return fetchFilteredDiscover(genres, filteredSpecial, 12);
+      if (dbFilms.length < 100 || page > 3)
+        return fetchBroadDiscover(15, (page - 1) * 60);
+      return Promise.resolve([] as FilmRecord[]);
+    })(),
   ]);
 
-  // Merge: recs first (personalised), then DB, then discover
+  // Merge: recs → DB → discover, dedup.
+  // Art House recs/discover are already empty (wantsArthouse skips them),
+  // and dbFilms were fetched directly from arthouse_films IDs, so no extra filter needed.
   const seen = new Set<number>(swipedIds);
   const filmPool: FilmRecord[] = [];
   for (const f of [...recFilms, ...dbFilms, ...discoverFilms]) {
@@ -179,35 +299,37 @@ export async function GET(request: NextRequest) {
     seedDirectors:  [],
   };
 
-  // ── Calibration ratio ──────────────────────────────────────────────────
-  // First 50 swipes: 80% prestige films to calibrate taste.
-  // After 50 swipes: 50% prestige, 50% personalised.
-  const swipeCount    = (swipes ?? []).length;
-  const isCalibrating = swipeCount < 50;
-  const TOTAL         = 30;
-  const prestigeTarget = isCalibrating ? Math.round(TOTAL * 0.8) : Math.round(TOTAL * 0.5); // 24 or 15
+  // ── Calibration: first 50 swipes favour prestige films ──────────────────
+  const swipeCount     = (swipes ?? []).length;
+  const isCalibrating  = swipeCount < 50;
+  const TOTAL          = 30;
+  const prestigeTarget = isCalibrating ? Math.round(TOTAL * 0.8) : Math.round(TOTAL * 0.5);
   const generalTarget  = TOTAL - prestigeTarget;
 
-  // Split pool by prestige status
-  const prestigePool = filmPool.filter(f => PRESTIGE_IDS.has(f.tmdb_id));
+  const prestigePool = filmPool.filter(f =>  PRESTIGE_IDS.has(f.tmdb_id));
   const generalPool  = filmPool.filter(f => !PRESTIGE_IDS.has(f.tmdb_id));
 
-  const deckArgs = { swipedIds, watchedIds: new Set<number>(), userPrefs, moods: [], genres, special };
+  const deckArgs = {
+    swipedIds, watchedIds: new Set<number>(), userPrefs, moods: [],
+    genres, special: filteredSpecial,
+  };
 
-  // Build from each pool — if prestige pool is thin, fall back to mixed
   const prestigeSlice = buildDeck({ pool: prestigePool, ...deckArgs, count: prestigeTarget });
-  const generalSlice  = buildDeck({ pool: generalPool,  ...deckArgs, count: generalTarget + Math.max(0, prestigeTarget - prestigeSlice.length) });
+  const generalSlice  = buildDeck({
+    pool: generalPool, ...deckArgs,
+    count: generalTarget + Math.max(0, prestigeTarget - prestigeSlice.length),
+  });
 
-  // Merge and shuffle so prestige films don't always appear first
+  // Shuffle the merged deck
   const merged = [...prestigeSlice, ...generalSlice];
   for (let i = merged.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [merged[i], merged[j]] = [merged[j], merged[i]];
   }
-  const deck = merged;
 
-  const films = deck.map(f => ({
+  const films = merged.map(f => ({
     tmdbId:     f.tmdb_id,
+    imdbId:     f.imdb_id || undefined,
     title:      f.title,
     year:       f.year,
     director:   f.director || "Unknown",

@@ -1,184 +1,188 @@
 import Link from "next/link";
 
-// Cobalt palette (matches HTML default)
-const PAL = {
-  bg:      "#1e3db0",
-  ink:     "#0b1840",
-  ctaBg:   "#E8453C",
-  ctaText: "#fff",
-  title:   "#F5F1EA",
-  sub:     "rgba(245,241,234,0.72)",
-  label:   "rgba(245,241,234,0.32)",
-};
+const BLUE = "#1B2FBB";
+const INK  = "#0d1a6e";
 
-function FilmReelIllustration() {
-  const { bg, ink } = PAL;
+function TvIllustration() {
   return (
-    <svg viewBox="0 0 390 620" preserveAspectRatio="xMidYMid slice"
-      style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "72%", display: "block" }}
-      xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="hd" x="-5%" y="-5%" width="110%" height="110%">
-          <feTurbulence type="turbulence" baseFrequency="0.018" numOctaves="3" seed="5" result="n"/>
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G"/>
-        </filter>
-        <linearGradient id="fade-down" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="52%" stopColor={bg} stopOpacity="0"/>
-          <stop offset="100%" stopColor="#0A0A0A" stopOpacity="1"/>
-        </linearGradient>
-      </defs>
-      <rect width="390" height="620" fill={bg}/>
+    <svg
+      viewBox="0 0 390 480"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ width: "100%", height: "100%", display: "block" }}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect width="390" height="480" fill={BLUE} />
 
-      {/* Film reel */}
-      <g filter="url(#hd)" stroke={ink} fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="195" cy="290" r="188" strokeWidth="5"/>
-        <circle cx="195" cy="290" r="62"  strokeWidth="4.5"/>
-        <circle cx="195" cy="290" r="58"  strokeWidth="0" fill={ink} opacity="0.08"/>
-        {[0,60,120,180,240,300].map((deg, i) => {
-          const r = deg * Math.PI / 180;
-          return <circle key={i} cx={195 + 130*Math.cos(r)} cy={290 + 130*Math.sin(r)} r="26" strokeWidth="3.5"/>;
-        })}
-        {[0,60,120,180,240,300].map((deg, i) => {
-          const r = deg * Math.PI / 180;
-          return <line key={i}
-            x1={195 + 64*Math.cos(r)}  y1={290 + 64*Math.sin(r)}
-            x2={195 + 104*Math.cos(r)} y2={290 + 104*Math.sin(r)} strokeWidth="3.5"/>;
-        })}
-      </g>
+      {/* ── TV ── */}
+      {/* Outer bezel */}
+      <rect x="42" y="52" width="306" height="210" rx="10"
+        stroke={INK} strokeWidth="4.5" fill="none" />
+      {/* Screen */}
+      <rect x="56" y="66" width="278" height="182" rx="5"
+        stroke={INK} strokeWidth="2.5" fill={INK} fillOpacity="0.12" />
+      {/* Scanlines hint */}
+      {[0,1,2,3,4].map(i =>
+        <line key={i}
+          x1="56" y1={100 + i * 34} x2="334" y2={100 + i * 34}
+          stroke={INK} strokeWidth="0.8" strokeOpacity="0.25" />
+      )}
+      {/* Stand neck */}
+      <line x1="195" y1="262" x2="195" y2="306"
+        stroke={INK} strokeWidth="4.5" strokeLinecap="round" />
+      {/* Stand base */}
+      <rect x="148" y="304" width="94" height="12" rx="5"
+        stroke={INK} strokeWidth="3.5" fill="none" />
 
-      {/* Film strip top */}
-      <g filter="url(#hd)" stroke={ink} fill="none" strokeWidth="3">
-        <rect x="-4" y="8" width="400" height="52" rx="3"/>
-        <rect x="-4" y="8" width="400" height="52" rx="3" fill={ink} opacity="0.07"/>
-        {[0,1,2,3,4,5,6,7,8,9].map(i =>
-          <rect key={i} x={8 + i*40} y="16" width="18" height="36" rx="3" strokeWidth="2.5"/>
-        )}
-      </g>
+      {/* ── Sofa ── */}
+      {/* Seat cushion */}
+      <rect x="28" y="368" width="334" height="70" rx="8"
+        stroke={INK} strokeWidth="4" fill="none" />
+      {/* Back rest */}
+      <rect x="28" y="330" width="334" height="44" rx="8"
+        stroke={INK} strokeWidth="4" fill="none" />
+      {/* Left arm */}
+      <rect x="14" y="348" width="24" height="90" rx="7"
+        stroke={INK} strokeWidth="3.5" fill="none" />
+      {/* Right arm */}
+      <rect x="352" y="348" width="24" height="90" rx="7"
+        stroke={INK} strokeWidth="3.5" fill="none" />
+      {/* Seat divider seam */}
+      <line x1="195" y1="368" x2="195" y2="438"
+        stroke={INK} strokeWidth="2" strokeOpacity="0.4" strokeDasharray="4 4" />
 
-      {/* Clapperboard */}
-      <g filter="url(#hd)" stroke={ink} fill="none" strokeWidth="3.5" strokeLinecap="round">
-        <rect x="290" y="100" width="88" height="68" rx="3"/>
-        <rect x="290" y="88"  width="88" height="18" rx="3" fill={ink} opacity="0.12"/>
-        <line x1="306" y1="88" x2="299" y2="106" strokeWidth="3"/>
-        <line x1="326" y1="88" x2="319" y2="106" strokeWidth="3"/>
-        <line x1="346" y1="88" x2="339" y2="106" strokeWidth="3"/>
-        <line x1="366" y1="88" x2="359" y2="106" strokeWidth="3"/>
-        <circle cx="290" cy="97" r="5" fill={ink} opacity="0.3"/>
-      </g>
+      {/* ── Person left ── */}
+      {/* Head */}
+      <circle cx="118" cy="300" r="26"
+        stroke={INK} strokeWidth="4" fill={BLUE} />
+      {/* Torso */}
+      <path d="M90,330 Q90,368 92,368 L144,368 Q146,368 146,330 Q133,320 118,320 Q103,320 90,330Z"
+        stroke={INK} strokeWidth="3.5" fill={BLUE} />
+      {/* Left arm reaching toward right person */}
+      <path d="M144,340 Q162,344 170,348"
+        stroke={INK} strokeWidth="3.5" fill="none" strokeLinecap="round" />
 
-      {/* Two figures watching */}
-      <g filter="url(#hd)" stroke={ink} fill={bg} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="92"  cy="490" rx="22" ry="22"/>
-        <path d="M68,514 C62,538 64,572 66,590 L118,590 C120,572 122,538 116,514 C110,507 98,504 92,504 C86,504 74,507 68,514Z"/>
-        <ellipse cx="148" cy="487" rx="22" ry="22"/>
-        <path d="M124,510 C118,534 120,568 122,590 L174,590 C176,568 178,534 172,510 C166,503 154,500 148,500 C142,500 130,503 124,510Z"/>
-        <path d="M124,530 Q108,520 96,525" strokeWidth="3" fill="none"/>
-      </g>
+      {/* ── Person right ── */}
+      {/* Head */}
+      <circle cx="272" cy="300" r="26"
+        stroke={INK} strokeWidth="4" fill={BLUE} />
+      {/* Torso */}
+      <path d="M244,330 Q244,368 246,368 L298,368 Q300,368 300,330 Q287,320 272,320 Q257,320 244,330Z"
+        stroke={INK} strokeWidth="3.5" fill={BLUE} />
 
-      {/* Sparkles */}
-      <g stroke={ink} strokeWidth="2.8" strokeLinecap="round" fill="none">
-        <line x1="46" y1="420" x2="46" y2="408"/><line x1="40" y1="414" x2="52" y2="414"/>
-        <line x1="42" y1="410" x2="50" y2="418"/><line x1="42" y1="418" x2="50" y2="410"/>
-        <line x1="355" y1="200" x2="355" y2="188"/><line x1="349" y1="194" x2="361" y2="194"/>
-        <line x1="351" y1="190" x2="359" y2="198"/><line x1="351" y1="198" x2="359" y2="190"/>
-        <circle cx="38"  cy="560" r="5" fill={ink} opacity="0.25"/>
-        <circle cx="362" cy="480" r="4" fill={ink} opacity="0.2"/>
-        <circle cx="270" cy="520" r="7" strokeWidth="2.5"/>
-      </g>
+      {/* ── Decorative dots / sparkles ── */}
+      <circle cx="36"  cy="200" r="5" stroke={INK} strokeWidth="2.5" fill="none" />
+      <circle cx="358" cy="160" r="5" stroke={INK} strokeWidth="2.5" fill="none" />
+      <circle cx="28"  cy="310" r="3.5" fill={INK} fillOpacity="0.35" />
+      <circle cx="362" cy="290" r="3.5" fill={INK} fillOpacity="0.35" />
 
-      <rect width="390" height="620" fill="url(#fade-down)"/>
+      {/* star left */}
+      <line x1="46" y1="154" x2="46" y2="142" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="40" y1="148" x2="52" y2="148" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="41" y1="143" x2="51" y2="153" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="41" y1="153" x2="51" y2="143" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+
+      {/* star right */}
+      <line x1="350" y1="84" x2="350" y2="72" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="344" y1="78" x2="356" y2="78" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="345" y1="73" x2="355" y2="83" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="345" y1="83" x2="355" y2="73" stroke={INK} strokeWidth="2.5" strokeLinecap="round" />
     </svg>
   );
 }
 
 export default function LandingPage() {
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", overflow: "hidden", background: "#0A0A0A" }}>
+    <div style={{
+      position: "absolute",
+      inset: 0,
+      background: BLUE,
+      display: "flex",
+      flexDirection: "column",
+      overflow: "hidden",
+    }}>
 
-      <FilmReelIllustration />
+      {/* Illustration — top portion */}
+      <div style={{ flex: "0 0 58%", position: "relative" }}>
+        <TvIllustration />
+      </div>
 
-      {/* Text content — bottom third */}
+      {/* Text + CTAs — bottom portion */}
       <div style={{
-        position: "relative",
         flex: 1,
         display: "flex",
         flexDirection: "column",
         justifyContent: "flex-end",
-        padding: "0 28px 48px",
+        padding: "0 28px calc(48px + env(safe-area-inset-bottom, 0px))",
       }}>
-        {/* Logo */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 96,
-            fontWeight: 400,
-            color: PAL.title,
-            lineHeight: 0.9,
-            letterSpacing: "0em",
-            textTransform: "uppercase",
-          }}>
-            Reel
-          </div>
-          <div style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10,
-            color: PAL.label,
-            letterSpacing: "0.22em",
-            marginTop: 14,
-          }}>
-            A FILM CLUB WITH FRIENDS
-          </div>
+        {/* Wordmark */}
+        <div style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 88,
+          color: "#F5F1EA",
+          lineHeight: 0.88,
+          letterSpacing: "-0.01em",
+          textTransform: "uppercase",
+          marginBottom: 10,
+        }}>
+          Reel
+        </div>
+
+        <div style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 9,
+          color: "rgba(245,241,234,0.5)",
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          marginBottom: 18,
+        }}>
+          A Film Club With Friends
         </div>
 
         <p style={{
           fontFamily: "var(--font-sans)",
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: 400,
-          lineHeight: 1.7,
-          color: PAL.sub,
+          lineHeight: 1.65,
+          color: "rgba(245,241,234,0.72)",
+          marginBottom: 32,
           maxWidth: 300,
-          marginBottom: 36,
         }}>
           Stop spending hours finding something to watch. Pick vibes, swipe curated films and match with friends. Tonight is sorted.
         </p>
 
+        {/* Log in */}
         <Link href="/login" style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           height: 54,
-          borderRadius: 3,
-          border: "none",
-          background: PAL.ctaBg,
-          color: PAL.ctaText,
+          borderRadius: 4,
+          background: "#E8453C",
+          color: "#fff",
           fontFamily: "var(--font-sans)",
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: 600,
-          letterSpacing: "0.1em",
+          letterSpacing: "0.04em",
           textDecoration: "none",
-          marginBottom: 10,
-          cursor: "pointer",
+          marginBottom: 14,
         }}>
-          Get started
+          Log in
         </Link>
 
-        <Link href="/demo" style={{
+        {/* Create account */}
+        <Link href="/login?signup=1" style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           height: 44,
-          borderRadius: 3,
-          background: "transparent",
-          border: `1px solid ${PAL.label}`,
-          color: PAL.label,
+          color: "rgba(245,241,234,0.6)",
           fontFamily: "var(--font-sans)",
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: 400,
-          letterSpacing: "0.08em",
+          letterSpacing: "0.02em",
           textDecoration: "none",
-          cursor: "pointer",
         }}>
-          Preview the app
+          Create an account
         </Link>
       </div>
     </div>

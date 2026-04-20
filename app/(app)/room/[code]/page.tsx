@@ -20,10 +20,11 @@ interface Room {
 }
 
 const SPECIAL_LABELS: Record<Special, string> = {
-  Short:   "Short  <100 min",
-  Epic:    "Epic  150+ min",
-  Classic: "Classic  pre-1980",
-  Recent:  "Recent  last 3 yrs",
+  Short:        "Short  <100 min",
+  Epic:         "Epic  150+ min",
+  Classic:      "Classic  pre-1980",
+  Recent:       "Recent  last 3 yrs",
+  "Art House":  "Art House",
 };
 
 export default function LiveRoomPage() {
@@ -33,9 +34,12 @@ export default function LiveRoomPage() {
   const [userId, setUserId]       = useState<string | null>(null);
   const [isHost, setIsHost]       = useState(false);
   const [films, setFilms]         = useState<FilmData[]>([]);
-  const [match, setMatch]         = useState<MatchFilm | null>(null);
+  const [match, setMatch]             = useState<MatchFilm | null>(null);
+  const [matchedFilms, setMatchedFilms] = useState<MatchFilm[]>([]);
+  const [showMatchList, setShowMatchList] = useState(false);
   const [copied, setCopied]       = useState(false);
   const [partnerName, setPartnerName] = useState("");
+  const [partnerId, setPartnerId]     = useState<string | null>(null);
   const [starting, setStarting]   = useState(false);
   const [selectedGenres,  setSelectedGenres]  = useState<Set<Genre>>(new Set());
   const [selectedSpecial, setSelectedSpecial] = useState<Set<Special>>(new Set());
@@ -131,7 +135,7 @@ export default function LiveRoomPage() {
     return () => { channelRef.current?.unsubscribe(); };
   }, [code]);
 
-  async function refreshPartnerName(roomId: string, myId: string) {
+  async function refreshPartnerName(roomId: string, myId: string): Promise<string | null> {
     const { data: pts } = await supabase
       .from("room_participants")
       .select("user_id")
@@ -139,10 +143,28 @@ export default function LiveRoomPage() {
       .neq("user_id", myId)
       .limit(1);
     if (pts?.[0]) {
+      const pid = pts[0].user_id;
+      setPartnerId(pid);
       const { data: prof } = await supabase
-        .from("profiles").select("username").eq("id", pts[0].user_id).single();
+        .from("profiles").select("username").eq("id", pid).single();
       if (prof?.username) setPartnerName(prof.username);
+      return pid;
     }
+    return null;
+  }
+
+  async function loadExistingMatches(pid: string) {
+    const res = await fetch(`/api/matches/${pid}`);
+    if (!res.ok) return;
+    const { matches } = await res.json();
+    if (!matches?.length) return;
+    setMatchedFilms(matches.map((m: any) => ({
+      title:      m.title,
+      year:       m.year,
+      director:   "",
+      posterUrl:  m.posterUrl,
+      friendName: partnerName || "friend",
+    })));
   }
 
   async function loadFilmsFromRoom(r: Room) {
@@ -159,6 +181,7 @@ export default function LiveRoomPage() {
       .filter(Boolean)
       .map((f: any): FilmData => ({
         tmdbId:     f.tmdb_id,
+        imdbId:     f.imdb_id || undefined,
         title:      f.title,
         year:       f.year,
         director:   f.director || "Unknown",
@@ -171,6 +194,10 @@ export default function LiveRoomPage() {
 
     setFilms(ordered);
     setPhase("swiping");
+
+    // Load any pre-existing matches between the two users
+    const pid = partnerId ?? await refreshPartnerName(r.id, (await supabase.auth.getUser()).data.user?.id ?? "");
+    if (pid) loadExistingMatches(pid);
   }
 
   async function startSwiping() {
@@ -187,18 +214,26 @@ export default function LiveRoomPage() {
     setFilms(data.films ?? []);
     setPhase("swiping");
     setStarting(false);
+
+    if (partnerId) loadExistingMatches(partnerId);
   }
 
   function checkMatch(tmdbId: number) {
     if (myLikes.current.has(tmdbId) && partnerLikes.current.has(tmdbId)) {
       const film = filmsRef.current.find(f => f.tmdbId === tmdbId);
       if (film) {
-        setMatch({
+        const matchFilm: MatchFilm = {
           title:      film.title,
           year:       film.year,
           director:   film.director,
           posterUrl:  film.posterUrl,
           friendName: partnerName || "friend",
+        };
+        setMatch(matchFilm);
+        setMatchedFilms(prev => {
+          // Avoid duplicates if checkMatch fires twice
+          if (prev.some(m => m.title === matchFilm.title && m.year === matchFilm.year)) return prev;
+          return [matchFilm, ...prev];
         });
       }
     }
@@ -213,17 +248,18 @@ export default function LiveRoomPage() {
       type: "broadcast", event: "swipe",
       payload: { tmdb_id: tmdbId, direction, user_id: userId },
     });
-    await fetch("/api/swipe", {
+    const res = await fetch("/api/swipe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tmdbId, direction, source: room?.id,
+        tmdbId, direction, source: "room",
         film: {
           title: film.title, year: film.year, posterUrl: film.posterUrl,
           genres: film.genres, plot: film.plot, tmdbRating: film.tmdbRating, director: film.director,
         },
       }),
     });
+    if (!res.ok) console.error("room swipe failed:", res.status, await res.text().catch(() => ""));
   }, [userId, room, partnerName]);
 
   function copyLink() {
@@ -410,14 +446,36 @@ export default function LiveRoomPage() {
       {/* ── Swiping ── */}
       {phase === "swiping" && (
         <>
-          {partnerName && (
-            <div style={{
-              textAlign: "center", padding: "6px 0 2px", flexShrink: 0,
-              fontFamily: "var(--font-mono)", fontSize: 9, color: "#3A3A3A", letterSpacing: "0.12em",
-            }}>
-              Swiping with <span style={{ color: "#5A5550" }}>@{partnerName}</span>
+          {/* Sub-header: partner name + See Matches button */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "6px 16px 2px", flexShrink: 0,
+          }}>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#3A3A3A", letterSpacing: "0.12em" }}>
+              {partnerName ? <>Swiping with <span style={{ color: "#5A5550" }}>@{partnerName}</span></> : ""}
             </div>
-          )}
+            <button
+              onClick={() => setShowMatchList(true)}
+              style={{
+                background: matchedFilms.length > 0 ? "#1a1408" : "transparent",
+                border: `1px solid ${matchedFilms.length > 0 ? "#C9A96140" : "rgba(245,241,234,0.08)"}`,
+                borderRadius: 2,
+                color: matchedFilms.length > 0 ? "#C9A961" : "#3A3A3A",
+                fontFamily: "var(--font-mono)",
+                fontSize: 9,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                padding: "5px 10px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              ♥ {matchedFilms.length} {matchedFilms.length === 1 ? "Match" : "Matches"}
+            </button>
+          </div>
+
           {films.length === 0 ? (
             <div style={{
               flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
@@ -434,6 +492,89 @@ export default function LiveRoomPage() {
             />
           )}
         </>
+      )}
+
+      {/* ── Match list modal ── */}
+      {showMatchList && (
+        <div
+          onClick={() => setShowMatchList(false)}
+          style={{
+            position: "absolute", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(8px)",
+            display: "flex", flexDirection: "column",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#0E0E0E",
+              border: "1px solid rgba(245,241,234,0.08)",
+              borderRadius: "4px 4px 0 0",
+              maxHeight: "80vh",
+              display: "flex", flexDirection: "column",
+            }}
+          >
+            {/* Modal header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "18px 20px 14px",
+              borderBottom: "1px solid rgba(245,241,234,0.06)",
+              flexShrink: 0,
+            }}>
+              <div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "#5A5550", letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 3 }}>
+                  Room matches
+                </div>
+                <div style={{ fontFamily: "var(--font-serif)", fontSize: 22, fontStyle: "italic", color: "#F5F1EA" }}>
+                  {matchedFilms.length} {matchedFilms.length === 1 ? "film" : "films"} you both liked
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMatchList(false)}
+                style={{
+                  background: "none", border: "none", color: "#5A5550",
+                  fontSize: 22, cursor: "pointer", padding: "4px 6px", lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Scrollable film list */}
+            <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "8px 0 24px" } as React.CSSProperties}>
+              {matchedFilms.map((m, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex", gap: 14, alignItems: "center",
+                    padding: "12px 20px",
+                    borderBottom: "1px solid rgba(245,241,234,0.04)",
+                  }}
+                >
+                  {m.posterUrl && (
+                    <div style={{ width: 42, height: 62, flexShrink: 0, borderRadius: 2, overflow: "hidden", background: "#141414" }}>
+                      <img src={m.posterUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: "var(--font-sans)", fontSize: 14, color: "#F5F1EA",
+                      fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {m.title}
+                    </div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#5A5550", marginTop: 3 }}>
+                      {m.year}{m.director && m.director !== "Unknown" ? ` · ${m.director}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ color: "#C9A961", fontSize: 16, flexShrink: 0 }}>♥</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

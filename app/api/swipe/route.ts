@@ -62,9 +62,13 @@ export async function POST(request: NextRequest) {
       f.user_id === user.id ? f.friend_id : f.user_id
     );
 
+    // Use admin client for cross-user reads/writes — RLS blocks reading friend's
+    // swipes and may block match inserts when the current user sorts as user_b.
+    const admin = createAdminClient();
+
     for (const friendId of friendIds) {
       // Check if friend also liked this film
-      const { data: friendSwipe } = await supabase
+      const { data: friendSwipe } = await admin
         .from("swipes")
         .select("id")
         .eq("user_id", friendId)
@@ -76,14 +80,16 @@ export async function POST(request: NextRequest) {
         // Create match (canonical order: smaller UUID first)
         const [userA, userB] = [user.id, friendId].sort();
 
-        const { error } = await supabase.from("matches").upsert({
+        const { error } = await admin.from("matches").upsert({
           user_a:   userA,
           user_b:   userB,
           imdb_id:  movie.imdb_id,
           context:  source ?? "async",
         }, { onConflict: "user_a,user_b,imdb_id" });
 
-        if (!error) {
+        if (error) {
+          console.error("match upsert failed:", error.message);
+        } else {
           // Get friend's username for the modal
           const { data: profile } = await supabase
             .from("profiles")

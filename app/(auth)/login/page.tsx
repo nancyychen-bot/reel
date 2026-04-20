@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const input: React.CSSProperties = {
@@ -18,9 +18,12 @@ const input: React.CSSProperties = {
   outline: "none",
 };
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const [mode, setMode]       = useState<"signin" | "signup">("signin");
+  const searchParams = useSearchParams();
+  const [mode, setMode]       = useState<"signin" | "signup">(
+    searchParams.get("signup") === "1" ? "signup" : "signin"
+  );
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,6 +49,91 @@ export default function LoginPage() {
     }
   }
 
+  return (
+    <>
+      {/* Tab toggle */}
+      <div style={{ display: "flex", marginBottom: 28, gap: 0 }}>
+        {(["signin", "signup"] as const).map(m => (
+          <button
+            key={m}
+            onClick={() => { setMode(m); setError(""); }}
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              borderBottom: `2px solid ${mode === m ? "#F5F1EA" : "rgba(245,241,234,0.08)"}`,
+              color: mode === m ? "#F5F1EA" : "#5A5550",
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              padding: "0 0 10px",
+              cursor: "pointer",
+              transition: "color 0.15s, border-color 0.15s",
+            }}
+          >
+            {m === "signin" ? "Sign in" : "Sign up"}
+          </button>
+        ))}
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="Email"
+          required
+          style={input}
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          placeholder="Password"
+          required
+          minLength={6}
+          style={{ ...input, marginBottom: error ? 8 : 16 }}
+        />
+
+        {error && (
+          <p style={{
+            fontFamily: "var(--font-sans)",
+            fontSize: 12,
+            color: "#E8453C",
+            marginBottom: 12,
+            lineHeight: 1.5,
+          }}>
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            background: "#E8453C",
+            border: "none",
+            color: "#fff",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            padding: "14px",
+            cursor: loading ? "not-allowed" : "pointer",
+            borderRadius: 2,
+            opacity: loading ? 0.6 : 1,
+          }}
+        >
+          {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
+        </button>
+      </form>
+    </>
+  );
+}
+
+export default function LoginPage() {
   return (
     <div style={{
       position: "absolute",
@@ -79,84 +167,9 @@ export default function LoginPage() {
         padding: "36px 28px",
         borderRadius: 3,
       }}>
-        {/* Tab toggle */}
-        <div style={{ display: "flex", marginBottom: 28, gap: 0 }}>
-          {(["signin", "signup"] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(""); }}
-              style={{
-                flex: 1,
-                background: "transparent",
-                border: "none",
-                borderBottom: `2px solid ${mode === m ? "#F5F1EA" : "rgba(245,241,234,0.08)"}`,
-                color: mode === m ? "#F5F1EA" : "#5A5550",
-                fontFamily: "var(--font-mono)",
-                fontSize: 9,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                padding: "0 0 10px",
-                cursor: "pointer",
-                transition: "color 0.15s, border-color 0.15s",
-              }}
-            >
-              {m === "signin" ? "Sign in" : "Sign up"}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="Email"
-            required
-            style={input}
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder="Password"
-            required
-            minLength={6}
-            style={{ ...input, marginBottom: error ? 8 : 16 }}
-          />
-
-          {error && (
-            <p style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              color: "#E8453C",
-              marginBottom: 12,
-              lineHeight: 1.5,
-            }}>
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
-              background: "#E8453C",
-              border: "none",
-              color: "#fff",
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
-              padding: "14px",
-              cursor: loading ? "not-allowed" : "pointer",
-              borderRadius: 2,
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
-          </button>
-        </form>
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );

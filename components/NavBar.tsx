@@ -10,8 +10,8 @@ const TABS = [
     glyph: "◈",
   },
   {
-    href:  "/friends",
-    label: "Friends",
+    href:  "/account",
+    label: "Account",
     glyph: null, // SVG
   },
   {
@@ -56,7 +56,8 @@ export default function NavBar() {
       zIndex: 100,
     }}>
       {TABS.map(tab => {
-        const active = pathname.startsWith(tab.href);
+        const active = pathname.startsWith(tab.href) ||
+          (tab.href === "/account" && pathname.startsWith("/friends"));
         return (
           <Link
             key={tab.href}

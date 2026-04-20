@@ -27,23 +27,29 @@ export default function FriendsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get friendships + match counts
-    const { data: fs } = await supabase
-      .from("friendships")
-      .select("user_id, friend_id, status")
-      .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+    // Fetch friendships and all matches in parallel.
+    // Matches use server-side admin client to bypass RLS (user may be user_b).
+    const [{ data: fs }, matchRes] = await Promise.all([
+      supabase.from("friendships").select("user_id, friend_id, status")
+        .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`),
+      fetch("/api/matches"),
+    ]);
 
     if (!fs) { setLoading(false); return; }
+
+    const allMatches: Array<{ friendId: string }> = matchRes.ok
+      ? (await matchRes.json()).matches ?? []
+      : [];
+
+    // Count matches per friend
+    const matchCountByFriend = new Map<string, number>();
+    for (const m of allMatches) {
+      matchCountByFriend.set(m.friendId, (matchCountByFriend.get(m.friendId) ?? 0) + 1);
+    }
 
     const enriched = await Promise.all(fs.map(async f => {
       const otherId = f.user_id === user.id ? f.friend_id : f.user_id;
       const { data: profile } = await supabase.from("profiles").select("username").eq("id", otherId).single();
-      const [ua, ub] = [user.id, otherId].sort();
-      const { count } = await supabase
-        .from("matches")
-        .select("id", { count: "exact", head: true })
-        .eq("user_a", ua)
-        .eq("user_b", ub);
 
       let status: Friend["status"] = "accepted";
       if (f.status === "pending") {
@@ -53,7 +59,7 @@ export default function FriendsPage() {
       return {
         id:         otherId,
         username:   profile?.username ?? "unknown",
-        matchCount: count ?? 0,
+        matchCount: matchCountByFriend.get(otherId) ?? 0,
         status,
       };
     }));

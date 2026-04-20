@@ -4,7 +4,7 @@ import { MutableRefObject, useEffect, useRef, useState } from "react";
 
 export interface FilmData {
   tmdbId:     number;
-  imdbId?:    string;
+  imdbId?:    string;   // real tt-prefixed IMDb ID when available from deck
   title:      string;
   year:       number;
   director:   string;
@@ -80,14 +80,18 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
     accent: film.accent ?? deriveAccent(film.title).accent,
   };
 
-  // Lazy-fetch OMDB enrichment when this card becomes top
+  // Prefetch OMDB enrichment for the top 5 cards so data is ready before the user gets there.
+  // Pass imdbId when available to skip the TMDB lookup on the server (fast path).
   useEffect(() => {
-    if (!isTop || enriched !== null) return;
-    fetch(`/api/omdb/${film.tmdbId}`)
+    if (stackIndex >= 5 || enriched !== null) return;
+    const url = film.imdbId?.startsWith("tt")
+      ? `/api/omdb/${film.tmdbId}?imdbId=${film.imdbId}`
+      : `/api/omdb/${film.tmdbId}`;
+    fetch(url)
       .then(r => r.json())
       .then(data => setEnriched(data))
       .catch(() => setEnriched({}));
-  }, [isTop, film.tmdbId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [stackIndex, film.tmdbId, film.imdbId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Expose programmatic swipe + details toggle to parent (button row)
   useEffect(() => {
@@ -475,6 +479,31 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
               {enriched?.awards ?? film.awards}
             </div>
           )}
+
+          {/* Learn More → Rotten Tomatoes */}
+          <a
+            href={`https://www.rottentomatoes.com/search?search=${encodeURIComponent(film.title)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-block",
+              marginTop: 20,
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "#5A5550",
+              border: "1px solid #222",
+              borderRadius: 2,
+              padding: "7px 14px",
+              textDecoration: "none",
+              transition: "color 0.15s, border-color 0.15s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#C9A961"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "#C9A96140"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#5A5550"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "#222"; }}
+          >
+            Learn More ↗
+          </a>
         </div>
 
         {/* Detail toggle */}

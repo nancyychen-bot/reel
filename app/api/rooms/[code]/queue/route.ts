@@ -39,9 +39,11 @@ export async function GET(
 
   // Parse genres/special from mood_tags (stored as ["Drama","Thriller","Short"] etc.)
   const tags: string[] = room.mood_tags ?? [];
-  const SPECIAL_VALUES = ["Short", "Epic", "Classic", "Recent"];
-  const genres  = tags.filter(t => !SPECIAL_VALUES.includes(t)) as Genre[];
-  const special = tags.filter(t =>  SPECIAL_VALUES.includes(t)) as Special[];
+  const SPECIAL_VALUES = ["Short", "Epic", "Classic", "Recent", "Art House"];
+  const genres         = tags.filter(t => !SPECIAL_VALUES.includes(t)) as Genre[];
+  const special        = tags.filter(t =>  SPECIAL_VALUES.includes(t)) as Special[];
+  const wantsArthouse  = special.includes("Art House");
+  const filteredSpecial = special.filter(s => s !== "Art House") as Special[];
 
   // Get participants and build prefs for both
   const { data: participants } = await supabase
@@ -68,6 +70,13 @@ export async function GET(
     participantIds.slice(0, 2).map(getPrefs)
   );
 
+  // Fetch arthouse IDs if Art House filter is active
+  let arthouseIds: Set<number> | null = null;
+  if (wantsArthouse) {
+    const { data: af } = await supabase.from("arthouse_films").select("tmdb_id");
+    arthouseIds = new Set((af ?? []).map((r: any) => r.tmdb_id));
+  }
+
   // Quality pool: prestige films at 7.0+, general films at 7.8+ only.
   // Live rooms should feel like a curated cinema programme.
   const { data: pool } = await supabase
@@ -91,8 +100,10 @@ export async function GET(
     list_count:  PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 1,
   });
 
-  // Split: prestige at any quality, general only if 7.8+
-  const allFilms    = (pool ?? []).map(toFilmRecord);
+  // Split: prestige at any quality, general only if 7.8+; filter by arthouse if requested
+  const allFilms    = (pool ?? [])
+    .filter((f: any) => !arthouseIds || arthouseIds.has(f.tmdb_id))
+    .map(toFilmRecord);
   const prestigePool = allFilms.filter(f => PRESTIGE_IDS.has(f.tmdb_id));
   const generalPool  = allFilms.filter(f => !PRESTIGE_IDS.has(f.tmdb_id) && f.tmdb_rating >= 7.8);
 
@@ -103,7 +114,7 @@ export async function GET(
     userBPrefs: userBPrefs ?? { favoriteGenres: [], seedGenres: [], seedDirectors: [] },
     moods:      [] as never[],
     genres,
-    special,
+    special:    filteredSpecial,
   };
 
   // Target 80% prestige in the 60-film queue

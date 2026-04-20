@@ -13,10 +13,11 @@ interface FilterPanelProps {
 }
 
 const SPECIAL_LABELS: Record<Special, string> = {
-  Short:   "Short  (<100 min)",
-  Epic:    "Epic  (150+ min)",
-  Classic: "Classic  (pre-1980)",
-  Recent:  "Recent  (last 3 yrs)",
+  Short:        "Short  (<100 min)",
+  Epic:         "Epic  (150+ min)",
+  Classic:      "Classic  (pre-1980)",
+  Recent:       "Recent  (last 3 yrs)",
+  "Art House":  "Art House",
 };
 
 export default function FilterPanel({

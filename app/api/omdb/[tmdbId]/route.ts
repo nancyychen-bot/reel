@@ -72,11 +72,51 @@ function parseFestivalAwards(awards: string): { wins: string[]; noms: string[] }
 }
 
 export async function GET(
-  _: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ tmdbId: string }> }
 ) {
   const { tmdbId } = await params;
-  if (!TMDB_KEY || !OMDB_KEY) return Response.json({});
+  if (!OMDB_KEY) return Response.json({});
+
+  // If the caller already knows the IMDb ID, skip the TMDB round-trip entirely.
+  const imdbIdParam = request.nextUrl.searchParams.get("imdbId");
+  const knownImdbId = imdbIdParam?.startsWith("tt") ? imdbIdParam : null;
+
+  if (knownImdbId) {
+    // Fast path: go straight to OMDB
+    const omdb = await fetch(
+      `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${knownImdbId}`,
+      { next: { revalidate: 86400 } }
+    ).then(r => r.json()).catch(() => null);
+
+    if (!omdb || omdb.Response === "False") {
+      return Response.json({ imdbId: knownImdbId });
+    }
+
+    const rtRating = (omdb.Ratings as Array<{ Source: string; Value: string }> | undefined)
+      ?.find(r => r.Source === "Rotten Tomatoes");
+    const rtScore    = rtRating ? parseInt(rtRating.Value) : undefined;
+    const imdbRating = omdb.imdbRating && omdb.imdbRating !== "N/A"
+      ? parseFloat(omdb.imdbRating) : undefined;
+    const awards = omdb.Awards && omdb.Awards !== "N/A" ? omdb.Awards : undefined;
+    const { wins: festivalWins, noms: festivalNoms } = parseFestivalAwards(omdb.Awards ?? "");
+
+    return Response.json({
+      imdbId:      knownImdbId,
+      imdbRating,
+      rtScore,
+      awards,
+      festivalWins: festivalWins.length ? festivalWins : undefined,
+      festivalNoms: festivalNoms.length ? festivalNoms : undefined,
+      director:  omdb.Director !== "N/A" ? omdb.Director : undefined,
+      runtime:   omdb.Runtime  !== "N/A" ? parseInt(omdb.Runtime) : undefined,
+      language:  omdb.Language !== "N/A" ? omdb.Language : undefined,
+      country:   omdb.Country  !== "N/A" ? omdb.Country  : undefined,
+    });
+  }
+
+  // Slow path: look up IMDb ID via TMDB first (fallback for cards without imdbId)
+  if (!TMDB_KEY) return Response.json({});
 
   const tmdbRes = await fetch(
     `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_KEY}&append_to_response=external_ids,credits`,

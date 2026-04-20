@@ -29,17 +29,21 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Auth-required routes — redirect to login if not authed
+  // Auth-required routes — redirect to login if not authed, preserving destination
   const appRoutes = ['/swipe', '/friends', '/rooms', '/room', '/lists', '/settings']
   const isAppRoute = appRoutes.some(r => pathname.startsWith(r))
 
   if (isAppRoute && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('next', pathname)
+    return NextResponse.redirect(loginUrl)
   }
 
-  // Redirect logged-in users away from auth pages
+  // Redirect logged-in users away from auth pages — respect next param if present
   if ((pathname === '/login' || pathname === '/') && user) {
-    return NextResponse.redirect(new URL('/swipe', request.url))
+    const next = request.nextUrl.searchParams.get('next')
+    const dest = next && next.startsWith('/') ? next : '/swipe'
+    return NextResponse.redirect(new URL(dest, request.url))
   }
 
   return supabaseResponse

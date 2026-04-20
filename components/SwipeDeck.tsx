@@ -17,12 +17,15 @@ export default function SwipeDeck({ films, onSwipe, onShortlist, onUndo, onEmpty
   const [lastSwiped, setLastSwiped] = useState<FilmData | null>(null);
   const triggerRef        = useRef<((dir: "like" | "pass") => void) | null>(null);
   const triggerDetailsRef = useRef<(() => void) | null>(null);
+  // Tracks every film ever added to the queue — including already-swiped ones.
+  // Prevents re-adding films when the parent's `films` array grows with new batches.
+  const everShownRef = useRef(new Set<number>());
 
-  // Append new films without duplicates
+  // Append only genuinely new films (never-before-shown)
   useEffect(() => {
     setQueue(prev => {
-      const seen = new Set(prev.map(f => f.tmdbId));
-      const toAdd = films.filter(f => !seen.has(f.tmdbId));
+      const toAdd = films.filter(f => !everShownRef.current.has(f.tmdbId));
+      toAdd.forEach(f => everShownRef.current.add(f.tmdbId));
       return toAdd.length ? [...prev, ...toAdd] : prev;
     });
   }, [films]);

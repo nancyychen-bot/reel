@@ -59,7 +59,7 @@ export default function SwipePage() {
       .then(r => r.json())
       .then(data => {
         const incoming = (data.films ?? []).filter((f: FilmData) => !swipedIds.current.has(f.tmdbId));
-        setFilms(prev => page === 1 ? incoming : [...prev, ...incoming]);
+        setFilms(incoming);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -304,6 +304,7 @@ export default function SwipePage() {
         </div>
       ) : (
         <SwipeDeck
+          key={[...Array.from(genres).sort(), ...Array.from(special).sort()].join(",")}
           films={films}
           onSwipe={handleSwipe}
           onShortlist={handleShortlist}

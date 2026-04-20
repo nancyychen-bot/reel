@@ -47,11 +47,6 @@ async function fetchDetails(tmdbId: number): Promise<any | null> {
 }
 
 export async function GET(request: NextRequest) {
-  const secret = request.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const offset = parseInt(request.nextUrl.searchParams.get("offset") ?? "0");
   const batch  = EBERT_FILMS.slice(offset, offset + BATCH);
   const admin  = createAdminClient();

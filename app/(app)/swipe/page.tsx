@@ -50,6 +50,11 @@ export default function SwipePage() {
     const s = Array.from(special);
     if (g.length) params.set("genres",  g.join(","));
     if (s.length) params.set("special", s.join(","));
+    // Send session-swiped IDs to server so it can exclude them immediately,
+    // without waiting for DB commits
+    if (swipedIds.current.size > 0) {
+      params.set("exclude", Array.from(swipedIds.current).join(","));
+    }
     fetch(`/api/deck?${params}`)
       .then(r => r.json())
       .then(data => {

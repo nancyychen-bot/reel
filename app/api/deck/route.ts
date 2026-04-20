@@ -217,9 +217,14 @@ async function fetchBroadDiscover(pages = 15, pageOffset = 0): Promise<FilmRecor
 export async function GET(request: NextRequest) {
   const genresParam  = request.nextUrl.searchParams.get("genres")  ?? "";
   const specialParam = request.nextUrl.searchParams.get("special") ?? "";
+  const excludeParam = request.nextUrl.searchParams.get("exclude") ?? "";
   const genres  = genresParam  ? (genresParam.split(",")  as Genre[])   : [];
   const special = specialParam ? (specialParam.split(",") as Special[]) : [];
   const page    = parseInt(request.nextUrl.searchParams.get("page") ?? "1");
+  // Session-swiped IDs sent by the client — exclude immediately without waiting for DB commits
+  const sessionExcludeIds = new Set<number>(
+    excludeParam ? excludeParam.split(",").map(Number).filter(n => n > 0) : []
+  );
 
   const wantsArthouse    = special.includes("Art House");
   const wantsPopular     = special.includes("Popular");
@@ -303,8 +308,8 @@ export async function GET(request: NextRequest) {
 
   const { data: swipedMoviesData } = await swipedMoviesPromise;
 
-  // Build swipedIds: movies-table lookup (real imdb_ids) + direct numeric ids
-  const swipedIds = new Set<number>(directTmdbIds);
+  // Build swipedIds: movies-table lookup (real imdb_ids) + direct numeric ids + session excludes
+  const swipedIds = new Set<number>([...directTmdbIds, ...sessionExcludeIds]);
   (swipedMoviesData ?? []).forEach((m: any) => swipedIds.add(m.tmdb_id));
 
   const likedTmdbIds: number[] = (swipedMoviesData ?? [])

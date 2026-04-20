@@ -244,20 +244,23 @@ export async function GET(request: NextRequest) {
       .eq("user_id", user.id)
       .maybeSingle(),
     supabase.from("swipes")
-      .select("imdb_id, direction")
+      .select("imdb_id, direction, source")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
   ]);
 
-  const allSwipedImdbIds = (swipes ?? []).map((s: any) => s.imdb_id).filter(Boolean);
+  // Room passes are temporary — don't permanently exclude them from the regular deck.
+  // Room likes still count as seen (user already liked it).
+  const isRoomPass = (s: any) => s.source === "room" && s.direction === "pass";
+  const allSwipedImdbIds = (swipes ?? []).filter((s: any) => !isRoomPass(s)).map((s: any) => s.imdb_id).filter(Boolean);
   const likedImdbSet     = new Set((swipes ?? []).filter((s: any) => s.direction === "like").map((s: any) => s.imdb_id));
 
   // ── Adaptive taste profile ───────────────────────────────────────────────
   const recentLikedIds = (swipes ?? [])
-    .filter((s: any) => s.direction === "like"  && isNaN(parseInt(s.imdb_id)))
+    .filter((s: any) => s.direction === "like" && isNaN(parseInt(s.imdb_id)))
     .slice(0, 60).map((s: any) => s.imdb_id);
   const recentPassedIds = (swipes ?? [])
-    .filter((s: any) => s.direction === "pass" && isNaN(parseInt(s.imdb_id)))
+    .filter((s: any) => s.direction === "pass" && !isRoomPass(s) && isNaN(parseInt(s.imdb_id)))
     .slice(0, 60).map((s: any) => s.imdb_id);
 
   const seedTmdbIds: number[] = prefs?.favorite_film_tmdb_ids ?? [];

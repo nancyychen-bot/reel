@@ -5,7 +5,7 @@ export const GENRES = [
 ] as const
 export type Genre = typeof GENRES[number]
 
-export const SPECIAL = ['Short', 'Epic', 'Classic', 'Recent', 'Art House'] as const
+export const SPECIAL = ['Short', 'Epic', 'Classic', 'Recent', 'Art House', 'Popular'] as const
 export type Special = typeof SPECIAL[number]
 
 export function matchesFilters(

@@ -144,6 +144,47 @@ async function fetchFilteredDiscover(
   );
 }
 
+// Popular discover: films with 5,000+ votes, sorted by vote count descending.
+// Optionally scoped to genre/special filters if also active.
+async function fetchPopularDiscover(
+  genres: Genre[],
+  special: Special[],
+  pages = 12,
+): Promise<FilmRecord[]> {
+  if (!TMDB_KEY) return [];
+
+  const genrePart = genres.length > 0
+    ? `with_genres=${genres.map(g => GENRE_TO_TMDB[g]).filter(Boolean).join("|")}`
+    : "";
+
+  const dateParts: string[] = [];
+  if (special.includes("Classic")) dateParts.push("primary_release_date.lte=1979-12-31");
+  if (special.includes("Recent"))  dateParts.push(`primary_release_date.gte=${CURRENT_YEAR - 3}-01-01`);
+
+  const base = [
+    genrePart,
+    ...dateParts,
+    "vote_count.gte=5000",
+    "sort_by=vote_count.desc",
+    "include_adult=false",
+  ].filter(Boolean).join("&");
+
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&${base}&page=${i + 1}`
+      ).then(r => r.json()).catch(() => ({ results: [] }))
+    )
+  );
+
+  const seen = new Set<number>();
+  return results.flatMap((p: any) =>
+    (p.results ?? [])
+      .filter((f: any) => f.poster_path && f.title && !seen.has(f.id) && seen.add(f.id))
+      .map((f: any) => tmdbResultToFilm(f))
+  );
+}
+
 // Broad fallback discover pool (no filter constraints) — used when no filters
 // are active and the DB is thin.
 async function fetchBroadDiscover(pages = 15, pageOffset = 0): Promise<FilmRecord[]> {
@@ -181,8 +222,9 @@ export async function GET(request: NextRequest) {
   const page    = parseInt(request.nextUrl.searchParams.get("page") ?? "1");
 
   const wantsArthouse    = special.includes("Art House");
-  const filteredSpecial  = special.filter(s => s !== "Art House") as Special[];
-  const hasFilters       = genres.length > 0 || filteredSpecial.length > 0;
+  const wantsPopular     = special.includes("Popular");
+  const filteredSpecial  = special.filter(s => s !== "Art House" && s !== "Popular") as Special[];
+  const hasFilters       = genres.length > 0 || filteredSpecial.length > 0 || wantsPopular;
   const hasRuntimeFilter = filteredSpecial.some(s => s === "Short" || s === "Epic");
 
   const supabase = await createClient();
@@ -274,6 +316,7 @@ export async function GET(request: NextRequest) {
     fetchRecommendations(likedTmdbIds, new Set([...swipedIds, ...dbIds])),
     (() => {
       if (wantsArthouse) return Promise.resolve([] as FilmRecord[]);
+      if (wantsPopular)  return fetchPopularDiscover(genres, filteredSpecial, 12);
       if (hasFilters)    return fetchFilteredDiscover(genres, filteredSpecial, 12);
       if (dbFilms.length < 100 || page > 3)
         return fetchBroadDiscover(15, (page - 1) * 60);

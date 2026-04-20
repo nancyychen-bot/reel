@@ -25,6 +25,7 @@ const SPECIAL_LABELS: Record<Special, string> = {
   Classic:      "Classic  pre-1980",
   Recent:       "Recent  last 3 yrs",
   "Art House":  "Art House",
+  Popular:      "Popular",
 };
 
 export default function LiveRoomPage() {

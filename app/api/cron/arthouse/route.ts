@@ -51,22 +51,15 @@ function extractFilmTitles(html: string): Array<{ title: string; director: strin
   const seen = new Set<string>();
 
   // Build a map from each table element to whether it falls under an award section heading
-  const awardSectionTables = new Set<cheerio.Element>();
-  $("h2, h3, h4, table.wikitable").each((_, el) => {
-    const tag = el.name?.toLowerCase();
-    if (tag === "h2" || tag === "h3" || tag === "h4") {
-      const headingText = $(el).text().toLowerCase();
-      if (AWARD_SECTION_RE.test(headingText)) {
-        // Mark all following wikitables until the next same-level heading as award tables
-        let next = $(el).next();
-        while (next.length) {
-          if (next.is("h2, h3, h4")) break;
-          if (next.is("table.wikitable")) awardSectionTables.add(next[0]);
-          // Also check inside divs
-          next.find("table.wikitable").each((__, t) => awardSectionTables.add(t));
-          next = next.next();
-        }
-      }
+  const awardSectionTables = new Set<unknown>();
+  $("h2, h3, h4").each((_, el) => {
+    if (!AWARD_SECTION_RE.test($(el).text())) return;
+    let next = $(el).next();
+    while (next.length) {
+      if (next.is("h2, h3, h4")) break;
+      if (next.is("table.wikitable")) awardSectionTables.add(next.get(0));
+      next.find("table.wikitable").each((__, t) => { awardSectionTables.add(t); });
+      next = next.next();
     }
   });
 

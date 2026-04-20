@@ -253,39 +253,77 @@ export async function GET(request: NextRequest) {
   const likedImdbSet     = new Set((swipes ?? []).filter((s: any) => s.direction === "like").map((s: any) => s.imdb_id));
 
   // ── Adaptive taste profile ───────────────────────────────────────────────
-  // Use the most recent 60 liked films to infer preferred genres + directors.
-  // Combined with onboarding picks, these power the +2 score bonus in the recommender.
   const recentLikedIds = (swipes ?? [])
-    .filter((s: any) => s.direction === "like" && isNaN(parseInt(s.imdb_id)))
-    .slice(0, 60)
-    .map((s: any) => s.imdb_id);
+    .filter((s: any) => s.direction === "like"  && isNaN(parseInt(s.imdb_id)))
+    .slice(0, 60).map((s: any) => s.imdb_id);
+  const recentPassedIds = (swipes ?? [])
+    .filter((s: any) => s.direction === "pass" && isNaN(parseInt(s.imdb_id)))
+    .slice(0, 60).map((s: any) => s.imdb_id);
 
   const seedTmdbIds: number[] = prefs?.favorite_film_tmdb_ids ?? [];
 
-  const [{ data: likedMoviesForPrefs }, { data: seedMovies }] = await Promise.all([
+  const [{ data: likedMoviesForPrefs }, { data: passedMoviesForPrefs }, { data: seedMovies }] = await Promise.all([
     recentLikedIds.length > 0
-      ? supabase.from("movies").select("genres, director").in("imdb_id", recentLikedIds)
+      ? supabase.from("movies").select("genres, director, year").in("imdb_id", recentLikedIds)
+      : Promise.resolve({ data: [] as any[] }),
+    recentPassedIds.length > 0
+      ? supabase.from("movies").select("genres, director").in("imdb_id", recentPassedIds)
       : Promise.resolve({ data: [] as any[] }),
     seedTmdbIds.length > 0
       ? supabase.from("movies").select("genres, director").in("tmdb_id", seedTmdbIds)
       : Promise.resolve({ data: [] as any[] }),
   ]);
 
-  // Count genre + director frequencies across liked films
-  const genreFreq    = new Map<string, number>();
-  const directorFreq = new Map<string, number>();
+  // Genre like-rate: likes / (likes + passes) per genre — normalises for saturation
+  const genreLikes  = new Map<string, number>();
+  const genrePasses = new Map<string, number>();
+  const dirLikes    = new Map<string, number>();
+  const dirPasses   = new Map<string, number>();
+
   for (const m of likedMoviesForPrefs ?? []) {
-    for (const g of m.genres ?? []) genreFreq.set(g, (genreFreq.get(g) ?? 0) + 1);
-    if (m.director) directorFreq.set(m.director, (directorFreq.get(m.director) ?? 0) + 1);
+    for (const g of m.genres ?? []) genreLikes.set(g,  (genreLikes.get(g)  ?? 0) + 1);
+    if (m.director) dirLikes.set(m.director, (dirLikes.get(m.director) ?? 0) + 1);
+  }
+  for (const m of passedMoviesForPrefs ?? []) {
+    for (const g of m.genres ?? []) genrePasses.set(g, (genrePasses.get(g) ?? 0) + 1);
+    if (m.director) dirPasses.set(m.director, (dirPasses.get(m.director) ?? 0) + 1);
   }
 
-  // Top 6 genres and top 4 directors by frequency (signals that actually reflect taste)
-  const topGenres    = [...genreFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g]) => g);
-  const topDirectors = [...directorFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([d]) => d);
+  // Genres with enough data points, ranked by like-rate
+  const allGenres = new Set([...genreLikes.keys(), ...genrePasses.keys()]);
+  const genreRates = [...allGenres]
+    .map(g => {
+      const l = genreLikes.get(g) ?? 0;
+      const p = genrePasses.get(g) ?? 0;
+      return { g, rate: l / (l + p), total: l + p };
+    })
+    .filter(x => x.total >= 3); // need at least 3 data points
 
-  // Merge adaptive likes with onboarding seed (onboarding adds context for new users)
-  const seedGenres    = [...new Set([...topGenres,    ...(seedMovies ?? []).flatMap((m: any) => m.genres ?? [])])];
-  const seedDirectors = [...new Set([...topDirectors, ...(seedMovies ?? []).map((m: any) => m.director).filter(Boolean)])];
+  const seedGenres    = [...new Set([
+    ...genreRates.filter(x => x.rate >= 0.55).sort((a, b) => b.rate - a.rate).slice(0, 6).map(x => x.g),
+    ...(seedMovies ?? []).flatMap((m: any) => m.genres ?? []),
+  ])];
+  const passedGenres  = genreRates.filter(x => x.rate <= 0.3).map(x => x.g);
+
+  // Directors: liked vs passed frequency
+  const allDirs = new Set([...dirLikes.keys(), ...dirPasses.keys()]);
+  const dirRates = [...allDirs].map(d => ({
+    d,
+    rate:  (dirLikes.get(d) ?? 0) / ((dirLikes.get(d) ?? 0) + (dirPasses.get(d) ?? 0)),
+    total: (dirLikes.get(d) ?? 0) + (dirPasses.get(d) ?? 0),
+  })).filter(x => x.total >= 2);
+
+  const seedDirectors    = [...new Set([
+    ...dirRates.filter(x => x.rate >= 0.6).sort((a, b) => b.rate - a.rate).slice(0, 4).map(x => x.d),
+    ...(seedMovies ?? []).map((m: any) => m.director).filter(Boolean),
+  ])];
+  const passedDirectors  = dirRates.filter(x => x.rate <= 0.25).map(x => x.d);
+
+  // Era preference: average release year of liked films
+  const likedYears = (likedMoviesForPrefs ?? []).map((m: any) => m.year).filter((y: number) => y > 1900);
+  const eraCenter  = likedYears.length > 0
+    ? Math.round(likedYears.reduce((a: number, b: number) => a + b, 0) / likedYears.length)
+    : 0;
 
   // Numeric placeholder imdb_ids (e.g. "12345") ARE the tmdb_id — add them directly.
   // This covers discover films whose movies upsert may have failed.
@@ -397,9 +435,12 @@ export async function GET(request: NextRequest) {
   }
 
   const userPrefs: UserPrefs = {
-    favoriteGenres: prefs?.preferred_genres ?? [],
+    favoriteGenres:  prefs?.preferred_genres ?? [],
     seedGenres,
     seedDirectors,
+    passedGenres,
+    passedDirectors,
+    eraCenter,
   };
 
   // ── Calibration: first 50 swipes favour prestige films ──────────────────

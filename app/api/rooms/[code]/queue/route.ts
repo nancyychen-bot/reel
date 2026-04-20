@@ -54,48 +54,72 @@ export async function GET(
   const participantIds = (participants ?? []).map((p: any) => p.user_id);
 
   async function getPrefs(uid: string): Promise<UserPrefs> {
-    const [{ data: prefs }, { data: swipes }] = await Promise.all([
+    const [{ data: prefs }, { data: likedSwipes }, { data: passedSwipes }] = await Promise.all([
       supabase.from("user_preferences")
         .select("preferred_genres, favorite_film_tmdb_ids")
-        .eq("user_id", uid)
-        .maybeSingle(),
-      supabase.from("swipes")
-        .select("imdb_id, direction")
-        .eq("user_id", uid)
-        .eq("direction", "like")
-        .order("created_at", { ascending: false })
-        .limit(60),
+        .eq("user_id", uid).maybeSingle(),
+      supabase.from("swipes").select("imdb_id")
+        .eq("user_id", uid).eq("direction", "like")
+        .order("created_at", { ascending: false }).limit(60),
+      supabase.from("swipes").select("imdb_id")
+        .eq("user_id", uid).eq("direction", "pass")
+        .order("created_at", { ascending: false }).limit(60),
     ]);
 
-    const recentLikedIds = (swipes ?? [])
-      .map((s: any) => s.imdb_id)
-      .filter((id: string) => isNaN(parseInt(id)));
-
+    const likedIds  = (likedSwipes  ?? []).map((s: any) => s.imdb_id).filter((id: string) => isNaN(parseInt(id)));
+    const passedIds = (passedSwipes ?? []).map((s: any) => s.imdb_id).filter((id: string) => isNaN(parseInt(id)));
     const seedTmdbIds: number[] = prefs?.favorite_film_tmdb_ids ?? [];
 
-    const [{ data: likedMovies }, { data: seedMovies }] = await Promise.all([
-      recentLikedIds.length > 0
-        ? supabase.from("movies").select("genres, director").in("imdb_id", recentLikedIds)
-        : Promise.resolve({ data: [] as any[] }),
-      seedTmdbIds.length > 0
-        ? supabase.from("movies").select("genres, director").in("tmdb_id", seedTmdbIds)
-        : Promise.resolve({ data: [] as any[] }),
+    const [{ data: likedMovies }, { data: passedMovies }, { data: seedMovies }] = await Promise.all([
+      likedIds.length  > 0 ? supabase.from("movies").select("genres, director, year").in("imdb_id", likedIds)  : Promise.resolve({ data: [] as any[] }),
+      passedIds.length > 0 ? supabase.from("movies").select("genres, director").in("imdb_id", passedIds)       : Promise.resolve({ data: [] as any[] }),
+      seedTmdbIds.length > 0 ? supabase.from("movies").select("genres, director").in("tmdb_id", seedTmdbIds)   : Promise.resolve({ data: [] as any[] }),
     ]);
 
-    const genreFreq    = new Map<string, number>();
-    const directorFreq = new Map<string, number>();
-    for (const m of likedMovies ?? []) {
-      for (const g of m.genres ?? []) genreFreq.set(g, (genreFreq.get(g) ?? 0) + 1);
-      if (m.director) directorFreq.set(m.director, (directorFreq.get(m.director) ?? 0) + 1);
+    const genreLikes  = new Map<string, number>();
+    const genrePasses = new Map<string, number>();
+    const dirLikes    = new Map<string, number>();
+    const dirPasses   = new Map<string, number>();
+
+    for (const m of likedMovies  ?? []) {
+      for (const g of m.genres ?? []) genreLikes.set(g,  (genreLikes.get(g)  ?? 0) + 1);
+      if (m.director) dirLikes.set(m.director, (dirLikes.get(m.director) ?? 0) + 1);
+    }
+    for (const m of passedMovies ?? []) {
+      for (const g of m.genres ?? []) genrePasses.set(g, (genrePasses.get(g) ?? 0) + 1);
+      if (m.director) dirPasses.set(m.director, (dirPasses.get(m.director) ?? 0) + 1);
     }
 
-    const topGenres    = [...genreFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g]) => g);
-    const topDirectors = [...directorFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([d]) => d);
+    const allGenres  = new Set([...genreLikes.keys(), ...genrePasses.keys()]);
+    const genreRates = [...allGenres].map(g => {
+      const l = genreLikes.get(g) ?? 0, p = genrePasses.get(g) ?? 0;
+      return { g, rate: l / (l + p), total: l + p };
+    }).filter(x => x.total >= 3);
+
+    const allDirs  = new Set([...dirLikes.keys(), ...dirPasses.keys()]);
+    const dirRates = [...allDirs].map(d => {
+      const l = dirLikes.get(d) ?? 0, p = dirPasses.get(d) ?? 0;
+      return { d, rate: l / (l + p), total: l + p };
+    }).filter(x => x.total >= 2);
+
+    const likedYears = (likedMovies ?? []).map((m: any) => m.year).filter((y: number) => y > 1900);
+    const eraCenter  = likedYears.length > 0
+      ? Math.round(likedYears.reduce((a: number, b: number) => a + b, 0) / likedYears.length)
+      : 0;
 
     return {
-      favoriteGenres: prefs?.preferred_genres ?? [],
-      seedGenres:     [...new Set([...topGenres,    ...(seedMovies ?? []).flatMap((m: any) => m.genres ?? [])])],
-      seedDirectors:  [...new Set([...topDirectors, ...(seedMovies ?? []).map((m: any) => m.director).filter(Boolean)])],
+      favoriteGenres:  prefs?.preferred_genres ?? [],
+      seedGenres:      [...new Set([
+        ...genreRates.filter(x => x.rate >= 0.55).sort((a, b) => b.rate - a.rate).slice(0, 6).map(x => x.g),
+        ...(seedMovies ?? []).flatMap((m: any) => m.genres ?? []),
+      ])],
+      seedDirectors:   [...new Set([
+        ...dirRates.filter(x => x.rate >= 0.6).sort((a, b) => b.rate - a.rate).slice(0, 4).map(x => x.d),
+        ...(seedMovies ?? []).map((m: any) => m.director).filter(Boolean),
+      ])],
+      passedGenres:    genreRates.filter(x => x.rate <= 0.3).map(x => x.g),
+      passedDirectors: dirRates.filter(x => x.rate <= 0.25).map(x => x.d),
+      eraCenter,
     };
   }
 

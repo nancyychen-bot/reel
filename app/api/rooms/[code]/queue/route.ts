@@ -68,16 +68,16 @@ export async function GET(
     participantIds.slice(0, 2).map(getPrefs)
   );
 
-  // Quality pool: seeded films only, rated 7.3+, ordered by rating desc
-  // This leans toward acclaimed/arthouse rather than mainstream blockbusters
+  // Quality pool: prestige films at 7.0+, general films at 7.8+ only.
+  // Live rooms should feel like a curated cinema programme.
   const { data: pool } = await supabase
     .from("movies")
     .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
-    .gte("tmdb_rating", 7.3)
+    .gte("tmdb_rating", 7.0)
     .order("tmdb_rating", { ascending: false })
-    .limit(600);
+    .limit(800);
 
-  const filmPool: FilmRecord[] = (pool ?? []).map((f: any) => ({
+  const toFilmRecord = (f: any): FilmRecord => ({
     tmdb_id:     f.tmdb_id,
     imdb_id:     f.imdb_id,
     title:       f.title,
@@ -89,19 +89,40 @@ export async function GET(
     poster_url:  f.poster_url ?? "",
     tmdb_rating: f.tmdb_rating ?? 0,
     list_count:  PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 1,
-  }));
+  });
 
-  const deck = buildRoomDeck({
-    pool:       filmPool,
-    swipedIds:  new Set(),
-    watchedIds: new Set(),
+  // Split: prestige at any quality, general only if 7.8+
+  const allFilms    = (pool ?? []).map(toFilmRecord);
+  const prestigePool = allFilms.filter(f => PRESTIGE_IDS.has(f.tmdb_id));
+  const generalPool  = allFilms.filter(f => !PRESTIGE_IDS.has(f.tmdb_id) && f.tmdb_rating >= 7.8);
+
+  const deckArgs = {
+    swipedIds:  new Set<number>(),
+    watchedIds: new Set<number>(),
     userAPrefs: userAPrefs ?? { favoriteGenres: [], seedGenres: [], seedDirectors: [] },
     userBPrefs: userBPrefs ?? { favoriteGenres: [], seedGenres: [], seedDirectors: [] },
-    moods:      [],
+    moods:      [] as never[],
     genres,
     special,
-    count:      60,
-  });
+  };
+
+  // Target 80% prestige in the 60-film queue
+  const TOTAL           = 60;
+  const prestigeTarget  = Math.round(TOTAL * 0.8); // 48
+  const generalTarget   = TOTAL - prestigeTarget;   // 12
+
+  const prestigeSlice = buildRoomDeck({ pool: prestigePool, ...deckArgs, count: prestigeTarget });
+  // If prestige pool was thin, fill extra slots from general
+  const extraNeeded   = Math.max(0, prestigeTarget - prestigeSlice.length);
+  const generalSlice  = buildRoomDeck({ pool: generalPool, ...deckArgs, count: generalTarget + extraNeeded });
+
+  // Merge and shuffle
+  const merged = [...prestigeSlice, ...generalSlice];
+  for (let i = merged.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [merged[i], merged[j]] = [merged[j], merged[i]];
+  }
+  const deck = merged;
 
   // Cache on room row so both users get identical films
   await supabase.from("rooms").update({

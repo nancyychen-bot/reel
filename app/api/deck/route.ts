@@ -175,16 +175,32 @@ export async function GET(request: NextRequest) {
     seedDirectors:  [],
   };
 
-  const deck = buildDeck({
-    pool:       filmPool,
-    swipedIds,
-    watchedIds: new Set(),
-    userPrefs,
-    moods:      [],
-    genres,
-    special,
-    count: 30,
-  });
+  // ── Calibration ratio ──────────────────────────────────────────────────
+  // First 50 swipes: 80% prestige films to calibrate taste.
+  // After 50 swipes: 50% prestige, 50% personalised.
+  const swipeCount    = (swipes ?? []).length;
+  const isCalibrating = swipeCount < 50;
+  const TOTAL         = 30;
+  const prestigeTarget = isCalibrating ? Math.round(TOTAL * 0.8) : Math.round(TOTAL * 0.5); // 24 or 15
+  const generalTarget  = TOTAL - prestigeTarget;
+
+  // Split pool by prestige status
+  const prestigePool = filmPool.filter(f => PRESTIGE_IDS.has(f.tmdb_id));
+  const generalPool  = filmPool.filter(f => !PRESTIGE_IDS.has(f.tmdb_id));
+
+  const deckArgs = { swipedIds, watchedIds: new Set<number>(), userPrefs, moods: [], genres, special };
+
+  // Build from each pool — if prestige pool is thin, fall back to mixed
+  const prestigeSlice = buildDeck({ pool: prestigePool, ...deckArgs, count: prestigeTarget });
+  const generalSlice  = buildDeck({ pool: generalPool,  ...deckArgs, count: generalTarget + Math.max(0, prestigeTarget - prestigeSlice.length) });
+
+  // Merge and shuffle so prestige films don't always appear first
+  const merged = [...prestigeSlice, ...generalSlice];
+  for (let i = merged.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [merged[i], merged[j]] = [merged[j], merged[i]];
+  }
+  const deck = merged;
 
   const films = deck.map(f => ({
     tmdbId:     f.tmdb_id,

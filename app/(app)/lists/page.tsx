@@ -271,15 +271,7 @@ export default function ListsPage() {
     const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(q)}`);
     if (res.ok) {
       const { results } = await res.json();
-      setSearchResults(
-        (results ?? []).slice(0, 8).map((f: any) => ({
-          id:        f.id,
-          title:     f.title,
-          year:      parseInt(f.release_date?.slice(0, 4) ?? "0") || 0,
-          posterUrl: f.poster_path ? `https://image.tmdb.org/t/p/w185${f.poster_path}` : "",
-          overview:  f.overview ?? "",
-        }))
-      );
+      setSearchResults((results ?? []).slice(0, 12));
     }
     setSearchLoading(false);
   }, []);

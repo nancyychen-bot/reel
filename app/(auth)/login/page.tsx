@@ -21,6 +21,7 @@ const input: React.CSSProperties = {
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "";
   const [mode, setMode]       = useState<"signin" | "signup">(
     searchParams.get("signup") === "1" ? "signup" : "signin"
   );
@@ -40,12 +41,18 @@ function LoginForm() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
       if (error) { setError(error.message); return; }
-      router.push("/swipe");
+      router.push(next || "/swipe");
     } else {
       const { error } = await supabase.auth.signUp({ email, password });
       setLoading(false);
       if (error) { setError(error.message); return; }
-      router.push("/onboarding");
+      // If coming from a room invite, skip onboarding and go straight to the room.
+      // They can set up their profile later via account settings.
+      if (next.startsWith("/room/")) {
+        router.push(next);
+      } else {
+        router.push("/onboarding");
+      }
     }
   }
 

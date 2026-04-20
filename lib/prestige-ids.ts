@@ -1,217 +1,331 @@
 /**
- * Prestige film TMDB IDs — drawn from canonical arthouse lists:
- *   • Sight & Sound Top 250 (2022)
- *   • Cannes Palme d'Or winners
- *   • Venice Golden Lion winners
- *   • Berlin Golden Bear winners
+ * Prestige film TMDB IDs — drawn from canonical arthouse/critical lists:
+ *   • films101.com Top 1000
+ *   • BFI Sight & Sound Greatest Films (2022)
+ *   • thecinemaarchives.com Best 1000
+ *   • Letterboxd most-watched (acclaimed picks only — the full list is mainstream)
+ *   • Cannes / Venice / Berlin award winners
  *   • Criterion Collection / MUBI essentials
- *   • Collider / Guardian / IMDb arthouse picks
  *   • Key works by major arthouse directors
  *
- * Films in this set receive list_count=3 in deck/room builders, triggering
- * the +2 score bonus in the recommender — they surface significantly more often.
+ * Films in this set receive list_count=3, triggering the +2 score bonus in
+ * the recommender — they surface significantly more often in the deck.
  */
 export const PRESTIGE_IDS = new Set<number>([
 
-  // ── Cannes Palme d'Or winners ──────────────────────────────────────────
-  496243,  // Parasite (2019) — Bong Joon-ho
-  527774,  // Shoplifters (2018) — Hirokazu Kore-eda
-  422855,  // The Square (2017) — Ruben Östlund
-  60308,   // The Tree of Life (2011) — Terrence Malick
-  21728,   // The White Ribbon (2009) — Michael Haneke
-  13277,   // The Class / Entre les murs (2008) — Laurent Cantet
-  12691,   // 4 Months, 3 Weeks and 2 Days (2007) — Cristian Mungiu
-  3060,    // Dancer in the Dark (2000) — Lars von Trier
-  11553,   // Rosetta (1999) — Dardenne Brothers
-  9472,    // The Piano (1993) — Jane Campion
-  11072,   // Three Colors: Red (1994) — Krzysztof Kieślowski
-  9655,    // Breaking the Waves (1996) — Lars von Trier
-  28178,   // Underground (1995) — Emir Kusturica
-  680,     // Pulp Fiction (1994) — Quentin Tarantino
-  28,      // Apocalypse Now (1979) — Francis Ford Coppola
-  820,     // The Conversation (1974) — Francis Ford Coppola
-  1340,    // La Dolce Vita (1960) — Federico Fellini
-  29907,   // Viridiana (1961) — Luis Buñuel
-  20986,   // Mon Oncle (1958) — Jacques Tati
-  22554,   // The Leopard (1963) — Luchino Visconti
+  // ── Silent era & pre-war classics ──────────────────────────────────────
+  15,      // Citizen Kane (1941)
+  534,     // Nosferatu (1922)
+  3920,    // Battleship Potemkin (1925)
+  34,      // The General (1926)
+  981,     // Metropolis (1927)
+  7001,    // Sunrise (1927)
+  11426,   // The Passion of Joan of Arc (1928)
+  15807,   // Pandora's Box (1928)
+  19665,   // Man with a Movie Camera (1929)
+  19815,   // Earth (1930)
+  4713,    // La Grande Illusion (1937)
+  18979,   // The Rules of the Game (1939)
+  31555,   // L'Atalante (1934)
 
-  // ── Venice Golden Lion winners ─────────────────────────────────────────
-  1034041, // Poor Things (2023) — Yorgos Lanthimos
-  552688,  // Roma (2018) — Alfonso Cuarón
-  581734,  // Nomadland (2020) — Chloé Zhao
-  72579,   // A Separation (2011) — Asghar Farhadi
-  430,     // Bicycle Thieves (1948) — Vittorio De Sica
-  11877,   // Rashomon (1950) — Akira Kurosawa
+  // ── 1940s ──────────────────────────────────────────────────────────────
+  289,     // Casablanca (1942)
+  9377,    // Double Indemnity (1944)
+  2769,    // Children of Paradise (1945)
+  9808,    // Rome, Open City (1945)
+  984,     // The Third Man (1949)
 
-  // ── Berlin Golden Bear winners ─────────────────────────────────────────
-  762504,  // Titane (2021) — Julia Ducournau (Palme)
-  432132,  // A Fantastic Woman (2017) — Sebastián Lelio
-  103216,  // Amour (2012) — Michael Haneke
+  // ── 1950s ──────────────────────────────────────────────────────────────
+  346,     // Seven Samurai (1954)
+  11877,   // Rashomon (1950)
+  1903,    // Sunset Boulevard (1950)
+  490,     // The Seventh Seal (1957)
+  22502,   // Wild Strawberries (1957)
+  18717,   // Ordet (1955)
+  15093,   // Tokyo Story (1953)
+  11778,   // Sansho the Bailiff (1954)
+  14551,   // Ugetsu (1953)
+  16361,   // Pather Panchali (1955)
+  4611,    // Aparajito (1956)
+  18917,   // Pickpocket (1959)
+  11499,   // Diary of a Country Priest (1951)
+  12666,   // A Man Escaped (1956)
+  2157,    // High Noon (1952)
+  8204,    // On the Waterfront (1954)
+  4154,    // Vertigo (1958)
+  4975,    // Rear Window (1954)
+  950,     // Some Like It Hot (1959)
+  24085,   // Ashes and Diamonds (1958)
+  18491,   // La Strada (1954)
+  11532,   // Ikiru (1952)
+  21504,   // Vampyr (1932)
+  24427,   // Charulata (1964)
 
-  // ── Grand Prix / Jury Prize Cannes ─────────────────────────────────────
-  1008042, // The Zone of Interest (2023) — Jonathan Glazer
-  654393,  // Triangle of Sadness (2022) — Ruben Östlund
-  770245,  // Compartment No. 6 (2021) — Juho Kuosmanen
-  736804,  // Drive My Car (2021) — Ryûsuke Hamaguchi
-  617258,  // Bacurau (2019) — Kleber Mendonça Filho
-  612885,  // Atlantics (2019) — Mati Diop
-  195544,  // The Great Beauty (2013) — Paolo Sorrentino
-  176042,  // Blue Is the Warmest Color (2013) — Abdellatif Kechiche
-  196936,  // Like Father, Like Son (2013) — Hirokazu Kore-eda
+  // ── 1960s ──────────────────────────────────────────────────────────────
+  1397,    // 8½ (1963)
+  1340,    // La Dolce Vita (1960)
+  2990,    // Breathless / À bout de souffle (1960)
+  2649,    // The 400 Blows (1959)
+  7988,    // L'Avventura (1960)
+  23400,   // L'Eclisse (1962)
+  10073,   // Red Desert (1964)
+  22285,   // Last Year at Marienbad (1961)
+  22488,   // Hiroshima Mon Amour (1959)
+  10054,   // The Discreet Charm of the Bourgeoisie (1972)
+  15260,   // The Umbrellas of Cherbourg (1964)
+  15474,   // Band of Outsiders (1964)
+  4809,    // Contempt / Le Mépris (1963)
+  9820,    // Weekend (1967)
+  14576,   // Jules and Jim (1962)
+  12079,   // Belle de Jour (1967)
+  10293,   // Playtime (1967)
+  14522,   // The Exterminating Angel (1962)
+  29907,   // Viridiana (1961)
+  26547,   // The Battle of Algiers (1965)
+  10528,   // Persona (1966)
+  17517,   // Andrei Rublev (1966)
+  7980,    // Blow-Up (1966)
+  14891,   // Le Samouraï (1967)
+  13841,   // The Gospel According to St. Matthew (1964)
+  23054,   // The Spirit of the Beehive (1973)
+  12662,   // Army of Shadows (1969)
+  12613,   // Vivre sa vie (1962)
+  213,     // Once Upon a Time in the West (1968)
+  18946,   // Throne of Blood (1957)
+  8077,    // The Searchers (1956)
+  935,     // Dr. Strangelove (1964)
+  4011,    // The Graduate (1967)
+  20,      // Lawrence of Arabia (1962)
+  539,     // Psycho (1960)
+
+  // ── 1970s ──────────────────────────────────────────────────────────────
+  238,     // The Godfather (1972)
+  240,     // The Godfather Part II (1974)
+  1535,    // Chinatown (1974)
+  62,      // 2001: A Space Odyssey (1968)
+  28,      // Apocalypse Now (1979)
+  820,     // The Conversation (1974)
+  4231,    // Taxi Driver (1976)
+  185,     // A Clockwork Orange (1971)
+  15919,   // Barry Lyndon (1975)
+  703,     // Annie Hall (1977)
+  1362,    // Raging Bull (1980)
+  10530,   // Cries and Whispers (1972)
+  2975,    // Scenes from a Marriage (1973)
+  8953,    // Mirror / Zerkalo (1975)
+  11202,   // Paris, Texas (1984)
+  6982,    // Amarcord (1973)
+  3282,    // Last Tango in Paris (1972)
+  6984,    // Theorem / Teorema (1968)
+  14537,   // The Conformist (1970)
+  11875,   // Jeanne Dielman, 23 Quai du Commerce (1975)
+  12476,   // Au Hasard Balthazar (1966)
+  1585,    // A Woman Under the Influence (1974)
+  2274,    // Ali: Fear Eats the Soul (1974)
+  2469,    // Days of Heaven (1978)
+  1911,    // Paths of Glory (1957)
+  10017,   // The Tin Drum (1979)
+  37285,   // Yol (1982)
+  14190,   // Aguirre, The Wrath of God (1972)
+  389,     // 12 Angry Men (1957)
+  10999,   // Do the Right Thing (1989)
+  8467,    // Touch of Evil (1958)
+
+  // ── 1980s ──────────────────────────────────────────────────────────────
+  8062,    // Stalker (1979)
+  22183,   // The Sacrifice (1986)
+  10837,   // Nostalghia (1983)
+  6972,    // Wings of Desire (1987)
+  11645,   // Ran (1985)
+  11517,   // Come and See (1985)
+  33267,   // The Ascent (1977)
+  398,     // Cinema Paradiso (1988)
+  46120,   // Tampopo (1985)
+  149,     // Akira (1988)
+  10515,   // Nausicaä of the Valley of the Wind (1984)
+  8392,    // My Neighbor Totoro (1988)
+  26354,   // Dekalog (1988)
+  30498,   // A Short Film About Killing (1988)
+  11876,   // Fitzcarraldo (1982)
+  3059,    // Fanny and Alexander (1982)
+  1710,    // Blue Velvet (1986)
+  194,     // Amélie (2001)
+  78,      // Blade Runner (1982)
+  694,     // The Shining (1980)
+  20629,   // Videodrome (1983)
+  26519,   // Possession (1981)
+  33514,   // Distant Voices, Still Lives (1988)
+  13096,   // Mouchette (1966)
+  22490,   // L'Argent (1983)
+  10921,   // Once Upon a Time in America (1983)
+  12477,   // Grave of the Fireflies (1988)
+  21799,   // Sans Soleil (1983)
+  34734,   // Landscape in the Mist (1988)
+  26505,   // The Green Ray (1986)
+
+  // ── 1990s ──────────────────────────────────────────────────────────────
+  128,     // Princess Mononoke (1997)
+  424,     // Schindler's List (1993)
+  680,     // Pulp Fiction (1994)
+  9655,    // Breaking the Waves (1996)
+  28178,   // Underground (1995)
+  11072,   // Three Colors: Red (1994)
+  11362,   // Three Colors: Blue (1993)
+  9472,    // The Piano (1993)
+  769,     // Goodfellas (1990)
+  11374,   // The Double Life of Véronique (1991)
+  11622,   // Chungking Express (1994)
+  9540,    // Secrets & Lies (1996)
+  9527,    // The Sweet Hereafter (1997)
+  14700,   // Taste of Cherry (1997)
+  9591,    // Funny Games (1997)
+  1582,    // La Haine (1995)
+  15340,   // Close-Up (1990)
+  23649,   // Werckmeister Harmonies (2000)
+  29833,   // Sátántangó (1994)
+  11839,   // Raise the Red Lantern (1991)
+  13234,   // Farewell My Concubine (1993)
+  19105,   // The Gleaners and I (2000)
+  14916,   // The Wind Will Carry Us (1999)
+  22803,   // Beau Travail (1999)
+  1422,    // Eyes Wide Shut (1999)
+  11564,   // All About My Mother (1999)
+  19,      // Magnolia (1999)
+  1645,    // Being John Malkovich (1999)
+  19841,   // Memories of Murder (2003)
+  12662,   // Army of Shadows (1969)
+  21732,   // A City of Sadness (1989)
+  18897,   // Happy Together (1997)
+  9830,    // Le Bonheur (1965)
+
+  // ── 2000s ──────────────────────────────────────────────────────────────
+  129,     // Spirited Away (2001)
+  10539,   // In the Mood for Love (2000)
+  11622,   // Chungking Express (1994)
+  11514,   // 2046 (2004)
+  16820,   // Yi Yi (2000)
+  11040,   // A Brighter Summer Day (1991)
+  3060,    // Dancer in the Dark (2000)
+  11553,   // Rosetta (1999)
+  403,     // Crouching Tiger, Hidden Dragon (2000)
+  670,     // Oldboy (2003)
+  9343,    // Y Tu Mamá También (2001)
+  4761,    // The Piano Teacher (2001)
+  1018,    // Mulholland Drive (2001)
+  4174,    // Irréversible (2002)
+  4803,    // Dogville (2003)
+  9329,    // The Son / Le Fils (2002)
+  14069,   // Talk to Her (2002)
+  598,     // City of God (2002)
+  38,      // Eternal Sunshine of the Spotless Mind (2004)
+  153,     // Lost in Translation (2003)
+  4586,    // Caché / Hidden (2005)
+  9298,    // The Child / L'Enfant (2005)
+  1933,    // The Lives of Others (2006)
+  1638,    // Pan's Labyrinth (2006)
+  13616,   // Still Life (2006)
+  12697,   // The Death of Mr. Lazarescu (2005)
+  9591,    // Funny Games (1997)
+  44943,   // Platform (2000)
+  20765,   // La Ciénaga (2001)
+  7345,    // There Will Be Blood (2007)
+  6977,    // No Country for Old Men (2007)
+  12691,   // 4 Months, 3 Weeks and 2 Days (2007)
+  14647,   // Waltz with Bashir (2008)
+  12720,   // The Diving Bell and the Butterfly (2007)
+  14280,   // Let the Right One In (2008)
+  27586,   // A Prophet (2009)
+  3053,    // Amores Perros (2000)
+  89540,   // Police, Adjective (2009)
+  27346,   // Dogtooth (2009)
+  107044,  // About Elly (2009)
+
+  // ── 2010s ──────────────────────────────────────────────────────────────
+  21728,   // The White Ribbon (2009)
+  72579,   // A Separation (2011)
+  103216,  // Amour (2012)
+  13277,   // The Class (2008)
+  46738,   // Certified Copy (2010)
+  52494,   // Poetry (2010)
+  52365,   // Of Gods and Men (2010)
   65843,   // Uncle Boonmee Who Can Recall His Past Lives (2010)
-  27586,   // A Prophet (2009) — Jacques Audiard
-  4586,    // Caché / Hidden (2005) — Michael Haneke
-  9298,    // The Child / L'Enfant (2005) — Dardenne Brothers
+  60308,   // The Tree of Life (2011)
+  74643,   // The Artist (2011)
+  60827,   // Melancholia (2011)
+  70670,   // We Need to Talk About Kevin (2011)
+  69151,   // Once Upon a Time in Anatolia (2011)
+  92368,   // Holy Motors (2012)
+  104732,  // The Hunt / Jagten (2012)
+  38757,   // Black Swan (2010)
+  204197,  // Under the Skin (2013)
+  218613,  // Ida (2013)
+  195544,  // The Great Beauty (2013)
+  176042,  // Blue Is the Warmest Color (2013)
+  196936,  // Like Father, Like Son (2013)
+  209112,  // Boyhood (2014)
+  258846,  // Leviathan (2014)
+  242268,  // The Duke of Burgundy (2014)
+  227700,  // Mommy (2014)
+  260310,  // Winter Sleep (2014)
+  169232,  // Force Majeure (2014)
+  328111,  // Son of Saul (2015)
+  254128,  // The Lobster (2015)
+  295842,  // The Assassin (2015)
+  309566,  // Mustang (2015)
+  320573,  // Cemetery of Splendour (2015)
+  381288,  // The Witch (2015)
+  376867,  // Moonlight (2016)
+  344786,  // Toni Erdmann (2016)
+  342473,  // The Handmaiden (2016)
+  373977,  // Personal Shopper (2016)
+  247614,  // Aquarius (2016)
+  95516,   // The Salesman (2016)
+  445617,  // Zama (2017)
+  427396,  // BPM (120 Beats Per Minute) (2017)
+  432132,  // A Fantastic Woman (2017)
+  400535,  // First Reformed (2017)
+  415442,  // A Ghost Story (2017)
+  422855,  // The Square (2017)
+  432121,  // Loveless (2017)
+  508442,  // Burning (2018)
+  534352,  // Cold War (2018)
+  491418,  // The Favourite (2018)
+  517208,  // Happy as Lazzaro (2018)
+  527774,  // Shoplifters (2018)
+  552688,  // Roma (2018)
+  519632,  // Long Day's Journey Into Night (2018)
+  496243,  // Parasite (2019)
+  601666,  // Portrait of a Lady on Fire (2019)
+  530385,  // Midsommar (2019)
+  612885,  // Atlantics (2019)
+  617258,  // Bacurau (2019)
+  591028,  // The Wild Goose Lake (2019)
+  577922,  // Corpus Christi (2019)
+  492188,  // Marriage Story (2019)
+  522241,  // The Souvenir (2019)
+  378236,  // First Cow (2019)
 
-  // ── Sight & Sound Top 250 / BFI essentials ────────────────────────────
-  62,      // 2001: A Space Odyssey (1968) — Stanley Kubrick
-  1397,    // 8½ (1963) — Federico Fellini
-  346,     // Seven Samurai (1954) — Akira Kurosawa
-  11645,   // Ran (1985) — Akira Kurosawa
-  10528,   // Persona (1966) — Ingmar Bergman
-  10530,   // Cries and Whispers (1972) — Ingmar Bergman
-  22502,   // Wild Strawberries (1957) — Ingmar Bergman
-  2975,    // Scenes from a Marriage (1973) — Ingmar Bergman
-  18717,   // Ordet / The Word (1955) — Carl Theodor Dreyer
-  8953,    // Mirror / Zerkalo (1975) — Andrei Tarkovsky
-  8062,    // Stalker (1979) — Andrei Tarkovsky
-  17517,   // Andrei Rublev (1966) — Andrei Tarkovsky
-  10837,   // Nostalghia (1983) — Andrei Tarkovsky
-  22183,   // The Sacrifice (1986) — Andrei Tarkovsky
-  2990,    // Breathless / À bout de souffle (1960) — Godard
-  2649,    // The 400 Blows (1959) — Truffaut
-  22285,   // Last Year at Marienbad (1961) — Alain Resnais
-  22488,   // Hiroshima Mon Amour (1959) — Alain Resnais
-  10054,   // The Discreet Charm of the Bourgeoisie (1972) — Buñuel
-  15260,   // The Umbrellas of Cherbourg (1964) — Jacques Demy
-  15474,   // Band of Outsiders (1964) — Godard
-  6982,    // Amarcord (1973) — Federico Fellini
-  10539,   // In the Mood for Love (2000) — Wong Kar-wai
-  11622,   // Chungking Express (1994) — Wong Kar-wai
-  11514,   // 2046 (2004) — Wong Kar-wai
-  16820,   // Yi Yi (2000) — Edward Yang
-  11040,   // A Brighter Summer Day (1991) — Edward Yang
-  129,     // Spirited Away (2001) — Hayao Miyazaki
-  128,     // Princess Mononoke (1997) — Hayao Miyazaki
-  8392,    // My Neighbor Totoro (1988) — Hayao Miyazaki
-  14700,   // Taste of Cherry (1997) — Abbas Kiarostami
-  14916,   // The Wind Will Carry Us (1999) — Abbas Kiarostami
-  15340,   // Close-Up (1990) — Abbas Kiarostami
-  11374,   // The Double Life of Véronique (1991) — Kieślowski
-  11362,   // Three Colors: Blue (1993) — Kieślowski
-  26354,   // Dekalog (1988) — Krzysztof Kieślowski
-  30498,   // A Short Film About Killing (1988) — Kieślowski
-  18917,   // Pickpocket (1959) — Robert Bresson
-  12666,   // A Man Escaped (1956) — Robert Bresson
-  6972,    // Wings of Desire (1987) — Wim Wenders
-  11202,   // Paris, Texas (1984) — Wim Wenders
-  11876,   // Fitzcarraldo (1982) — Werner Herzog
-  11517,   // Come and See (1985) — Elem Klimov
-  33267,   // The Ascent (1977) — Larisa Shepitko
-  23649,   // Werckmeister Harmonies (2000) — Béla Tarr
-  29833,   // Sátántangó (1994) — Béla Tarr
-  19105,   // The Gleaners and I (2000) — Agnès Varda
-  21799,   // Sans Soleil (1983) — Chris Marker
-  23054,   // The Spirit of the Beehive (1973) — Víctor Erice
-  34734,   // Landscape in the Mist (1988) — Theo Angelopoulos
-  37285,   // Yol (1982) — Yilmaz Güney
-  46120,   // Tampopo (1985) — Juzo Itami
-  149,     // Akira (1988) — Katsuhiro Otomo
-  398,     // Cinema Paradiso (1988) — Giuseppe Tornatore
-  185,     // A Clockwork Orange (1971) — Stanley Kubrick
-  15919,   // Barry Lyndon (1975) — Stanley Kubrick
-  403,     // Crouching Tiger, Hidden Dragon (2000) — Ang Lee
-  3282,    // Last Tango in Paris (1972) — Bernardo Bertolucci
-  6984,    // Theorem / Teorema (1968) — Pier Paolo Pasolini
-
-  // ── Contemporary prestige (2015–2024) ─────────────────────────────────
-  1084199, // Past Lives (2023) — Celine Song
-  1064213, // All of Us Strangers (2023) — Andrew Haigh
-  1164707, // Monster (2023) — Hirokazu Kore-eda
-  792777,  // Aftersun (2022) — Charlotte Wells
-  674324,  // The Banshees of Inisherin (2022) — Martin McDonagh
-  811721,  // Holy Spider (2022) — Ali Abbasi
-  830082,  // EO (2022) — Jerzy Skolimowski
-  774752,  // Tár (2022) — Todd Field
-  829280,  // All Quiet on the Western Front (2022) — Edward Berger
-  813640,  // Decision to Leave (2022) — Park Chan-wook
-  649097,  // The Worst Person in the World (2021) — Joachim Trier
-  650871,  // The Power of the Dog (2021) — Jane Campion
-  736140,  // A Hero (2021) — Asghar Farhadi
-  755566,  // Flee (2021) — Jonas Poher Rasmussen
-  710017,  // Quo Vadis, Aida? (2020) — Jasmila Žbanić
-  535581,  // Waves (2019) — Trey Edward Shults
-  577922,  // Corpus Christi (2019) — Jan Komasa
-  591028,  // The Wild Goose Lake (2019) — Diao Yinan
-  601666,  // Portrait of a Lady on Fire (2019) — Céline Sciamma
-  492188,  // Marriage Story (2019) — Noah Baumbach
-  522241,  // The Souvenir (2019) — Joanna Hogg
-  530385,  // Midsommar (2019) — Ari Aster
-  508442,  // Burning (2018) — Lee Chang-dong
-  534352,  // Cold War (2018) — Paweł Pawlikowski
-  491418,  // The Favourite (2018) — Yorgos Lanthimos
-  517208,  // Happy as Lazzaro (2018) — Alice Rohrwacher
-  519632,  // Long Day's Journey Into Night (2018) — Bi Gan
-  432121,  // Loveless (2017) — Andrei Zvyagintsev
-  427396,  // BPM (120 Beats Per Minute) (2017) — Robin Campillo
-  400535,  // First Reformed (2017) — Paul Schrader
-  415442,  // A Ghost Story (2017) — David Lowery
-  376867,  // Moonlight (2016) — Barry Jenkins
-  344786,  // Toni Erdmann (2016) — Maren Ade
-  342473,  // The Handmaiden (2016) — Park Chan-wook
-  373977,  // Personal Shopper (2016) — Olivier Assayas
-  247614,  // Aquarius (2016) — Kleber Mendonça Filho
-  320573,  // Cemetery of Splendour (2015) — Apichatpong
-  309566,  // Mustang (2015) — Deniz Gamze Ergüven
-  295842,  // The Assassin (2015) — Hou Hsiao-hsien
-  328111,  // Son of Saul (2015) — László Nemes
-  381288,  // The Witch (2015) — Robert Eggers
-  242268,  // The Duke of Burgundy (2014) — Peter Strickland
-  258846,  // Leviathan (2014) — Andrei Zvyagintsev
-  227700,  // Mommy (2014) — Xavier Dolan
-  169232,  // Force Majeure (2014) — Ruben Östlund
-
-  // ── 2000s arthouse ────────────────────────────────────────────────────
-  218613,  // Ida (2013) — Paweł Pawlikowski
-  92368,   // Holy Motors (2012) — Leos Carax
-  104732,  // The Hunt / Jagten (2012) — Thomas Vinterberg
-  70670,   // We Need to Talk About Kevin (2011) — Lynne Ramsay
-  69151,   // Once Upon a Time in Anatolia (2011) — Nuri Bilge Ceylan
-  74643,   // The Artist (2011) — Michel Hazanavicius
-  46738,   // Certified Copy (2010) — Abbas Kiarostami
-  52494,   // Poetry (2010) — Lee Chang-dong
-  52365,   // Of Gods and Men (2010) — Xavier Beauvois
-  27346,   // Dogtooth (2009) — Yorgos Lanthimos
-  14280,   // Let the Right One In (2008) — Tomas Alfredson
-  13277,   // The Class (2008) — Laurent Cantet
-  19841,   // Memories of Murder (2003) — Bong Joon-ho
-  670,     // Oldboy (2003) — Park Chan-wook
-  9329,    // The Son / Le Fils (2002) — Dardenne Brothers
-  4174,    // Irréversible (2002) — Gaspar Noé
-  9343,    // Y Tu Mamá También (2001) — Alfonso Cuarón
-  4761,    // The Piano Teacher (2001) — Michael Haneke
-  1018,    // Mulholland Drive (2001) — David Lynch
-  4803,    // Dogville (2003) — Lars von Trier
-  9527,    // The Sweet Hereafter (1997) — Atom Egoyan
-  9540,    // Secrets & Lies (1996) — Mike Leigh
-  1933,    // The Lives of Others (2006) — Florian Henckel von Donnersmarck
-  1638,    // Pan's Labyrinth (2006) — Guillermo del Toro
-  13616,   // Still Life (2006) — Jia Zhangke
-  12697,   // The Death of Mr. Lazarescu (2005) — Cristi Puiu
-  89540,   // Police, Adjective (2009) — Corneliu Porumboiu
-  11564,   // All About My Mother (1999) — Pedro Almodóvar
-  14069,   // Talk to Her (2002) — Pedro Almodóvar
-  1422,    // Eyes Wide Shut (1999) — Stanley Kubrick
-  22803,   // Beau Travail (1999) — Claire Denis
-  1582,    // La Haine / Hate (1995) — Mathieu Kassovitz
-  9591,    // Funny Games (1997) — Michael Haneke
-  44943,   // Platform (2000) — Jia Zhangke
-  20765,   // La Ciénaga (2001) — Lucrecia Martel
-  378236,  // First Cow (2019) — Kelly Reichardt
-  70587,   // Meek's Cutoff (2010) — Kelly Reichardt
-  95516,   // The Salesman (2016) — Asghar Farhadi
-  107044,  // About Elly (2009) — Asghar Farhadi
-  254128,  // The Lobster (2015) — Yorgos Lanthimos
-  616037,  // The Lighthouse (2019) — Robert Eggers
-  537915,  // Hereditary (2018) — Ari Aster
+  // ── 2020s ──────────────────────────────────────────────────────────────
+  581734,  // Nomadland (2020)
+  710017,  // Quo Vadis, Aida? (2020)
+  736804,  // Drive My Car (2021)
+  762504,  // Titane (2021)
+  649097,  // The Worst Person in the World (2021)
+  650871,  // The Power of the Dog (2021)
+  736140,  // A Hero (2021)
+  755566,  // Flee (2021)
+  770245,  // Compartment No. 6 (2021)
+  792777,  // Aftersun (2022)
+  674324,  // The Banshees of Inisherin (2022)
+  811721,  // Holy Spider (2022)
+  813640,  // Decision to Leave (2022)
+  774752,  // Tár (2022)
+  829280,  // All Quiet on the Western Front (2022)
+  830082,  // EO (2022)
+  654393,  // Triangle of Sadness (2022)
+  1008042, // The Zone of Interest (2023)
+  1034041, // Poor Things (2023)
+  1064213, // All of Us Strangers (2023)
+  1084199, // Past Lives (2023)
+  1164707, // Monster (2023)
 ]);

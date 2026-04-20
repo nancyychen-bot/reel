@@ -102,6 +102,29 @@ export default function OnboardingPage() {
       preferred_genres: Array.from(genres),
     });
 
+    // Add selected films to liked list
+    const selectedFilms = topFilms.filter(f => selected.has(f.id));
+    await Promise.all(
+      selectedFilms.map(f =>
+        fetch("/api/swipe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tmdbId:    f.id,
+            direction: "like",
+            source:    "onboarding",
+            film: {
+              title:    f.title,
+              year:     parseInt(f.year) || 0,
+              posterUrl: f.poster_path
+                ? `https://image.tmdb.org/t/p/w780${f.poster_path}`
+                : "",
+            },
+          }),
+        })
+      )
+    );
+
     router.push("/swipe");
   }
 

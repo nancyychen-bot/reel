@@ -45,12 +45,13 @@ export default function LiveRoomPage() {
   const [selectedGenres,  setSelectedGenres]  = useState<Set<Genre>>(new Set());
   const [selectedSpecial, setSelectedSpecial] = useState<Set<Special>>(new Set());
 
-  const supabase     = createClient();
-  const channelRef   = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const myLikes      = useRef<Set<number>>(new Set());
-  const partnerLikes = useRef<Set<number>>(new Set());
-  const filmsRef     = useRef<FilmData[]>([]);
-  const roomRef      = useRef<Room | null>(null);
+  const supabase          = createClient();
+  const channelRef        = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // Per-user like sets — keyed by user_id. A match fires only when ALL participants liked the film.
+  const allLikes          = useRef<Map<string, Set<number>>>(new Map());
+  const participantCount  = useRef<number>(0);
+  const filmsRef          = useRef<FilmData[]>([]);
+  const roomRef           = useRef<Room | null>(null);
 
   useEffect(() => { filmsRef.current = films; }, [films]);
   useEffect(() => { roomRef.current = room; }, [room]);
@@ -79,11 +80,15 @@ export default function LiveRoomPage() {
       // Fetch partner name
       await refreshPartnerName(r.id, user.id);
 
+      // Seed an empty like-set for the current user
+      allLikes.current.set(user.id, new Set());
+
       // Count current participants
       const { count } = await supabase
         .from("room_participants")
         .select("user_id", { count: "exact", head: true })
         .eq("room_id", r.id);
+      participantCount.current = count ?? 1;
 
       // Determine starting phase
       if (r.status === "active" && r.queue_imdb_ids?.length) {
@@ -106,6 +111,7 @@ export default function LiveRoomPage() {
             .from("room_participants")
             .select("user_id", { count: "exact", head: true })
             .eq("room_id", r.id);
+          participantCount.current = c ?? participantCount.current;
           if ((c ?? 0) >= 2) setPhase(prev => prev === "waiting" ? "selecting" : prev);
         })
         .on("postgres_changes", {
@@ -138,7 +144,10 @@ export default function LiveRoomPage() {
         .on("broadcast", { event: "swipe" }, ({ payload }) => {
           if (payload.user_id === user.id) return;
           if (payload.direction === "like") {
-            partnerLikes.current.add(payload.tmdb_id);
+            if (!allLikes.current.has(payload.user_id)) {
+              allLikes.current.set(payload.user_id, new Set());
+            }
+            allLikes.current.get(payload.user_id)!.add(payload.tmdb_id);
             checkMatch(payload.tmdb_id);
           }
         })
@@ -239,29 +248,39 @@ export default function LiveRoomPage() {
   }
 
   function checkMatch(tmdbId: number) {
-    if (myLikes.current.has(tmdbId) && partnerLikes.current.has(tmdbId)) {
-      const film = filmsRef.current.find(f => f.tmdbId === tmdbId);
-      if (film) {
-        const matchFilm: MatchFilm = {
-          title:      film.title,
-          year:       film.year,
-          director:   film.director,
-          posterUrl:  film.posterUrl,
-          friendName: partnerName || "friend",
-        };
-        setMatch(matchFilm);
-        setMatchedFilms(prev => {
-          // Avoid duplicates if checkMatch fires twice
-          if (prev.some(m => m.title === matchFilm.title && m.year === matchFilm.year)) return prev;
-          return [matchFilm, ...prev];
-        });
-      }
+    const total = participantCount.current;
+    if (total < 2) return;
+
+    // Count how many participants have liked this film
+    let likedBy = 0;
+    for (const likes of allLikes.current.values()) {
+      if (likes.has(tmdbId)) likedBy++;
+    }
+
+    // Match only when every participant in the room has liked it
+    if (likedBy < total) return;
+
+    const film = filmsRef.current.find(f => f.tmdbId === tmdbId);
+    if (film) {
+      const matchFilm: MatchFilm = {
+        title:      film.title,
+        year:       film.year,
+        director:   film.director,
+        posterUrl:  film.posterUrl,
+        friendName: partnerName || "friend",
+      };
+      setMatch(matchFilm);
+      setMatchedFilms(prev => {
+        if (prev.some(m => m.title === matchFilm.title && m.year === matchFilm.year)) return prev;
+        return [matchFilm, ...prev];
+      });
     }
   }
 
   const handleSwipe = useCallback(async (tmdbId: number, direction: "like" | "pass", film: FilmData) => {
-    if (direction === "like") {
-      myLikes.current.add(tmdbId);
+    if (direction === "like" && userId) {
+      if (!allLikes.current.has(userId)) allLikes.current.set(userId, new Set());
+      allLikes.current.get(userId)!.add(tmdbId);
       checkMatch(tmdbId);
     }
     channelRef.current?.send({

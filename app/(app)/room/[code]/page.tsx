@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import SwipeDeck from "@/components/SwipeDeck";
 import MatchModal, { type MatchFilm } from "@/components/MatchModal";
@@ -30,7 +30,6 @@ const SPECIAL_LABELS: Record<Special, string> = {
 
 export default function LiveRoomPage() {
   const { code } = useParams<{ code: string }>();
-  const router   = useRouter();
   const [phase, setPhase]         = useState<Phase>("loading");
   const [room, setRoom]           = useState<Room | null>(null);
   const [userId, setUserId]       = useState<string | null>(null);
@@ -60,10 +59,7 @@ export default function LiveRoomPage() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.replace(`/login?next=/room/${code}`);
-        return;
-      }
+      if (!user) return; // middleware already redirected; this is a fallback
       setUserId(user.id);
 
       const { data: r } = await supabase

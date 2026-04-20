@@ -164,7 +164,7 @@ async function fetchPopularDiscover(
   const base = [
     genrePart,
     ...dateParts,
-    "vote_count.gte=5000",
+    "vote_count.gte=50000",
     "sort_by=vote_count.desc",
     "include_adult=false",
   ].filter(Boolean).join("&");

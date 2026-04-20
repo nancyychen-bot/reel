@@ -327,7 +327,7 @@ export async function GET(request: NextRequest) {
     (() => {
       if (wantsArthouse) return Promise.resolve([] as FilmRecord[]);
       if (wantsPopular)  return fetchPopularDiscover(genres, filteredSpecial, 12);
-      if (hasFilters)    return fetchFilteredDiscover(genres, filteredSpecial, 12);
+      if (hasFilters)    return fetchFilteredDiscover(genres, filteredSpecial, 20);
       if (dbFilms.length < 100 || page > 3)
         return fetchBroadDiscover(15, (page - 1) * 60);
       return Promise.resolve([] as FilmRecord[]);

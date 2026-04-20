@@ -33,7 +33,8 @@ export default function SwipeDeck({ films, onSwipe, onShortlist, onUndo, onEmpty
       setLastSwiped(film);
       setQueue(prev => {
         const next = prev.filter(f => f.tmdbId !== film.tmdbId);
-        if (next.length <= 5) onEmpty?.();
+        // Fire once when queue first crosses the low-water mark, not on every swipe below it
+        if (prev.length > 5 && next.length <= 5) onEmpty?.();
         return next;
       });
     },

@@ -248,6 +248,14 @@ export async function GET(request: NextRequest) {
       .eq("user_id", user.id),
   ]);
 
+  // Look up seed films (onboarding picks) to extract genres + directors
+  const seedTmdbIds: number[] = prefs?.favorite_film_tmdb_ids ?? [];
+  const { data: seedMovies } = seedTmdbIds.length > 0
+    ? await supabase.from("movies").select("genres, director").in("tmdb_id", seedTmdbIds)
+    : { data: [] as any[] };
+  const seedGenres    = [...new Set((seedMovies ?? []).flatMap((m: any) => m.genres ?? []))];
+  const seedDirectors = [...new Set((seedMovies ?? []).map((m: any) => m.director).filter(Boolean))];
+
   const allSwipedImdbIds = (swipes ?? []).map((s: any) => s.imdb_id).filter(Boolean);
   const likedImdbSet     = new Set((swipes ?? []).filter((s: any) => s.direction === "like").map((s: any) => s.imdb_id));
 
@@ -362,8 +370,8 @@ export async function GET(request: NextRequest) {
 
   const userPrefs: UserPrefs = {
     favoriteGenres: prefs?.preferred_genres ?? [],
-    seedGenres:     [],
-    seedDirectors:  [],
+    seedGenres,
+    seedDirectors,
   };
 
   // ── Calibration: first 50 swipes favour prestige films ──────────────────

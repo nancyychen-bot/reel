@@ -59,10 +59,16 @@ export async function GET(
       .select("preferred_genres, favorite_film_tmdb_ids")
       .eq("user_id", uid)
       .maybeSingle();
+
+    const seedTmdbIds: number[] = prefs?.favorite_film_tmdb_ids ?? [];
+    const { data: seedMovies } = seedTmdbIds.length > 0
+      ? await supabase.from("movies").select("genres, director").in("tmdb_id", seedTmdbIds)
+      : { data: [] as any[] };
+
     return {
       favoriteGenres: prefs?.preferred_genres ?? [],
-      seedGenres:     [],
-      seedDirectors:  [],
+      seedGenres:     [...new Set((seedMovies ?? []).flatMap((m: any) => m.genres ?? []))],
+      seedDirectors:  [...new Set((seedMovies ?? []).map((m: any) => m.director).filter(Boolean))],
     };
   }
 

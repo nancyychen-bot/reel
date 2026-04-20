@@ -313,7 +313,8 @@ export async function GET(request: NextRequest) {
   // For Art House we rely entirely on the DB (arthouse_films).
   // For broad unfiltered browsing, only run discover when DB is thin or on later pages.
   const [recFilms, discoverFilms] = await Promise.all([
-    fetchRecommendations(likedTmdbIds, new Set([...swipedIds, ...dbIds])),
+    // Skip recommendations for Popular — they're not vote-count filtered
+    wantsPopular ? Promise.resolve([] as FilmRecord[]) : fetchRecommendations(likedTmdbIds, new Set([...swipedIds, ...dbIds])),
     (() => {
       if (wantsArthouse) return Promise.resolve([] as FilmRecord[]);
       if (wantsPopular)  return fetchPopularDiscover(genres, filteredSpecial, 12);
@@ -325,11 +326,14 @@ export async function GET(request: NextRequest) {
   ]);
 
   // Merge: recs → DB → discover, dedup.
-  // Art House recs/discover are already empty (wantsArthouse skips them),
-  // and dbFilms were fetched directly from arthouse_films IDs, so no extra filter needed.
+  // Popular: use only discover (DB has no vote_count filter).
+  // Art House: recs/discover are empty; DB was fetched from arthouse_films IDs directly.
   const seen = new Set<number>(swipedIds);
   const filmPool: FilmRecord[] = [];
-  for (const f of [...recFilms, ...dbFilms, ...discoverFilms]) {
+  const mergeSource = wantsPopular
+    ? discoverFilms
+    : [...recFilms, ...dbFilms, ...discoverFilms];
+  for (const f of mergeSource) {
     if (!seen.has(f.tmdb_id)) {
       seen.add(f.tmdb_id);
       filmPool.push(f);

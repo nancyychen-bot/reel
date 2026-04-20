@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildRoomDeck, type FilmRecord, type UserPrefs } from "@/lib/recommender";
 import { type Genre, type Special } from "@/lib/filters";
+import { PRESTIGE_IDS } from "@/lib/prestige-ids";
 
 export async function GET(
   _: NextRequest,
@@ -87,7 +88,7 @@ export async function GET(
     plot:        f.plot ?? "",
     poster_url:  f.poster_url ?? "",
     tmdb_rating: f.tmdb_rating ?? 0,
-    list_count:  1, // all DB films are curated — score them as such
+    list_count:  PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 1,
   }));
 
   const deck = buildRoomDeck({

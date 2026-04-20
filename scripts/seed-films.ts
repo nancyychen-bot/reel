@@ -11,6 +11,7 @@
 
 import * as fs from "fs";
 import { createClient } from "@supabase/supabase-js";
+import { PRESTIGE_IDS } from "../lib/prestige-ids";
 
 // ── Env ───────────────────────────────────────────────────────────────────
 const envFile = fs.readFileSync(".env.local", "utf8");
@@ -96,6 +97,38 @@ async function fetchDetail(tmdbId: number): Promise<{
   }
 }
 
+// ── Fetch a full film record by TMDB ID (for prestige seeding) ────────────
+async function fetchFullDetail(tmdbId: number): Promise<{
+  tmdb_id: number; imdb_id: string; title: string; year: number;
+  runtime_minutes: number | null; genres: string[]; director: string | null;
+  plot: string; poster_url: string; tmdb_rating: number;
+} | null> {
+  try {
+    const [detail, credits] = await Promise.all([
+      fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_KEY}&append_to_response=external_ids`)
+        .then(r => r.json()),
+      fetch(`https://api.themoviedb.org/3/movie/${tmdbId}/credits?api_key=${TMDB_KEY}`)
+        .then(r => r.json()),
+    ]);
+    if (!detail.title || !detail.poster_path) return null;
+    return {
+      tmdb_id:         tmdbId,
+      imdb_id:         detail.external_ids?.imdb_id ?? String(tmdbId),
+      title:           detail.title,
+      year:            parseInt(detail.release_date?.slice(0, 4) ?? "0"),
+      runtime_minutes: detail.runtime ?? null,
+      genres:          (detail.genres ?? []).map((g: { name: string }) => g.name),
+      director:        (credits.crew as Array<{ job: string; name: string }> | undefined)
+                         ?.find(c => c.job === "Director")?.name ?? null,
+      plot:            detail.overview ?? "",
+      poster_url:      `https://image.tmdb.org/t/p/w780${detail.poster_path}`,
+      tmdb_rating:     detail.vote_average ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ── Delay helper ─────────────────────────────────────────────────────────
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -178,10 +211,29 @@ async function main() {
     await sleep(350); // ~40 req/s TMDB limit, we're doing 10 req per batch
   }
 
-  // 4. Also upsert the films already in DB (to refresh poster_url to w780 etc.)
-  //    Skip for now to keep runtime manageable.
+  // 4. Phase 3: Ensure all prestige films are in the DB
+  //    Some obscure arthouse films have low vote counts and won't appear in Discover.
+  //    Fetch them directly by TMDB ID.
+  console.log("\nPhase 3: Ensuring prestige films are seeded…\n");
+  const allIds = new Set([...existingIds, ...toFetch.map(c => c.tmdb_id)]);
+  const missingPrestige = Array.from(PRESTIGE_IDS).filter(id => !allIds.has(id));
+  console.log(`  Prestige films missing from DB: ${missingPrestige.length}`);
 
-  console.log(`\n\n✓ Seeded ${inserted} new films. DB now has ${existingIds.size + inserted} total.\n`);
+  let prestigeInserted = 0;
+  for (let i = 0; i < missingPrestige.length; i += BATCH) {
+    const batch = missingPrestige.slice(i, i + BATCH);
+    const details = await Promise.all(batch.map(id => fetchFullDetail(id)));
+    const rows = details.filter(d => d !== null) as NonNullable<typeof details[0]>[];
+    if (rows.length) {
+      const { error } = await supabase.from("movies").upsert(rows, { onConflict: "tmdb_id" });
+      if (error) console.error(`  Prestige upsert error: ${error.message}`);
+      else prestigeInserted += rows.length;
+    }
+    await sleep(400);
+  }
+
+  console.log(`\n✓ Seeded ${inserted} discover films + ${prestigeInserted} prestige films.`);
+  console.log(`  DB now has ~${existingIds.size + inserted + prestigeInserted} total.\n`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

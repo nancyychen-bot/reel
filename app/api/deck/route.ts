@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildDeck, type FilmRecord, type UserPrefs } from "@/lib/recommender";
 import { type Genre, type Special } from "@/lib/filters";
+import { PRESTIGE_IDS } from "@/lib/prestige-ids";
 
 const TMDB_KEY = process.env.TMDB_API_KEY;
 
@@ -144,7 +145,9 @@ export async function GET(request: NextRequest) {
     .order("tmdb_rating", { ascending: false })
     .limit(500);
 
-  const dbFilms: FilmRecord[] = (dbPool ?? []).map((f: any) => tmdbResultToFilm(f));
+  const dbFilms: FilmRecord[] = (dbPool ?? []).map((f: any) =>
+    tmdbResultToFilm(f, PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 0)
+  );
   const dbIds = new Set(dbFilms.map(f => f.tmdb_id));
 
   // Fetch personalised recs + broader discover in parallel

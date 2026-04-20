@@ -42,17 +42,43 @@ async function fetchWikiPage(title: string): Promise<string | null> {
   } catch { return null; }
 }
 
-function extractFilmTitles(html: string): Array<{ title: string; director: string }> {
+const AWARD_SECTION_RE = /\b(award|prize|winner|palme|golden\s+lion|silver\s+lion|golden\s+bear|silver\s+bear|jury|special\s+mention)\b/i;
+const AWARD_COLUMN_RE  = /\b(award|prize)\b/i;
+
+function extractFilmTitles(html: string): Array<{ title: string; director: string; isAward: boolean }> {
   const $ = cheerio.load(html);
-  const results: Array<{ title: string; director: string }> = [];
+  const results: Array<{ title: string; director: string; isAward: boolean }> = [];
   const seen = new Set<string>();
+
+  // Build a map from each table element to whether it falls under an award section heading
+  const awardSectionTables = new Set<cheerio.Element>();
+  $("h2, h3, h4, table.wikitable").each((_, el) => {
+    const tag = el.name?.toLowerCase();
+    if (tag === "h2" || tag === "h3" || tag === "h4") {
+      const headingText = $(el).text().toLowerCase();
+      if (AWARD_SECTION_RE.test(headingText)) {
+        // Mark all following wikitables until the next same-level heading as award tables
+        let next = $(el).next();
+        while (next.length) {
+          if (next.is("h2, h3, h4")) break;
+          if (next.is("table.wikitable")) awardSectionTables.add(next[0]);
+          // Also check inside divs
+          next.find("table.wikitable").each((__, t) => awardSectionTables.add(t));
+          next = next.next();
+        }
+      }
+    }
+  });
 
   $("table.wikitable").each((_, table) => {
     const headers: string[] = [];
     $(table).find("tr").first().find("th").each((_, th) => { headers.push($(th).text().trim().toLowerCase()); });
-    const filmCol = headers.findIndex(h => h.includes("film") || h.includes("title"));
-    const dirCol  = headers.findIndex(h => h.includes("director"));
+    const filmCol  = headers.findIndex(h => h.includes("film") || h.includes("title"));
+    const dirCol   = headers.findIndex(h => h.includes("director"));
     if (filmCol === -1) return;
+
+    // A table is an "awards table" if it's under an award heading OR has an award/prize column
+    const tableIsAward = awardSectionTables.has(table) || headers.some(h => AWARD_COLUMN_RE.test(h));
 
     $(table).find("tr").slice(1).each((_, row) => {
       const cells = $(row).find("td");
@@ -63,7 +89,7 @@ function extractFilmTitles(html: string): Array<{ title: string; director: strin
       if (!title || title.length < 2 || title.length > 100 || seen.has(title.toLowerCase())) return;
       seen.add(title.toLowerCase());
       const director = dirCol >= 0 ? cells.eq(dirCol).text().replace(/\[\d+\]/g, "").trim().split("\n")[0].trim() : "";
-      results.push({ title, director });
+      results.push({ title, director, isAward: tableIsAward });
     });
   });
   return results;
@@ -102,7 +128,7 @@ export async function GET(request: NextRequest) {
     if (!html) continue;
 
     const films = extractFilmTitles(html);
-    for (const { title, director } of films) {
+    for (const { title, director, isAward } of films) {
       const tmdb = await searchTmdb(title, year);
       if (!tmdb || existingIds.has(tmdb.id)) continue;
 
@@ -120,13 +146,14 @@ export async function GET(request: NextRequest) {
         runtime_minutes: null,
       }, { onConflict: "tmdb_id" });
 
-      // Upsert into arthouse_films — merge festivals if already present
-      const { data: af } = await admin.from("arthouse_films").select("festivals").eq("tmdb_id", tmdb.id).maybeSingle();
+      // Upsert into arthouse_films — merge festivals; promote award_winner if any festival says so
+      const { data: af } = await admin.from("arthouse_films").select("festivals, award_winner").eq("tmdb_id", tmdb.id).maybeSingle();
       const festivals = [...new Set([...(af?.festivals ?? []), festival.name])];
-      await admin.from("arthouse_films").upsert({ tmdb_id: tmdb.id, festivals }, { onConflict: "tmdb_id" });
+      const awardWinner = af?.award_winner || isAward; // once true, stays true
+      await admin.from("arthouse_films").upsert({ tmdb_id: tmdb.id, festivals, award_winner: awardWinner }, { onConflict: "tmdb_id" });
 
       existingIds.add(tmdb.id);
-      added.push(`${festival.name}: ${tmdb.title}`);
+      added.push(`${festival.name}: ${tmdb.title}${isAward ? " [award]" : ""}`);
     }
   }
 

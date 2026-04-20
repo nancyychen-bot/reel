@@ -127,11 +127,14 @@ export async function GET(
     participantIds.slice(0, 2).map(getPrefs)
   );
 
-  // Fetch arthouse IDs if Art House filter is active
+  // Fetch arthouse IDs if Art House filter is active — prefer award winners
   let arthouseIds: Set<number> | null = null;
   if (wantsArthouse) {
-    const { data: af } = await supabase.from("arthouse_films").select("tmdb_id");
-    arthouseIds = new Set((af ?? []).map((r: any) => r.tmdb_id));
+    const { data: af } = await supabase.from("arthouse_films").select("tmdb_id, award_winner");
+    const allAf   = af ?? [];
+    const awardIds = allAf.filter((r: any) => r.award_winner).map((r: any) => r.tmdb_id as number);
+    const allIds   = allAf.map((r: any) => r.tmdb_id as number);
+    arthouseIds = new Set(awardIds.length >= 30 ? awardIds : allIds);
   }
 
   // Quality pool: prestige films at 7.0+, general films at 7.8+ only.

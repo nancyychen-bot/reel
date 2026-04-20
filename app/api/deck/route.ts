@@ -347,11 +347,15 @@ export async function GET(request: NextRequest) {
   let arthouseIds: Set<number> | null = null;
 
   if (wantsArthouse) {
-    // For Art House: fetch arthouse IDs first, then query movies for exactly those IDs.
-    // This guarantees we pull ALL seeded arthouse films rather than hoping they fall
-    // within the top-N by rating from the entire movies table.
-    const { data: af } = await supabase.from("arthouse_films").select("tmdb_id");
-    const afIds = (af ?? []).map((r: any) => r.tmdb_id as number);
+    // For Art House: fetch arthouse records with award_winner flag.
+    // Prefer award winners (Palme d'Or, Golden Lion, etc.) — fall back to all
+    // arthouse selections only when the award-winner pool is too thin (< 30 films).
+    const { data: af } = await supabase.from("arthouse_films").select("tmdb_id, award_winner");
+    const allAf = af ?? [];
+    const awardIds = allAf.filter((r: any) => r.award_winner).map((r: any) => r.tmdb_id as number);
+    const allAfIds = allAf.map((r: any) => r.tmdb_id as number);
+    // Use award winners if there are enough; otherwise fall back to all arthouse
+    const afIds = awardIds.length >= 30 ? awardIds : allAfIds;
     arthouseIds = new Set(afIds);
 
     if (afIds.length > 0) {

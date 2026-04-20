@@ -319,6 +319,24 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
           background: "#0A0A0A", borderTop: "1px solid #181818",
           padding: "14px 20px 16px", zIndex: 5,
         }}>
+          {/* Festival badge — shown once OMDB enrichment loads */}
+          {enriched?.festivalWins && enriched.festivalWins.length > 0 && (
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 4,
+              background: "rgba(201,169,97,0.10)",
+              border: "1px solid rgba(201,169,97,0.30)",
+              borderRadius: 2, padding: "2px 7px",
+              marginBottom: 5,
+            }}>
+              <span style={{ fontSize: 9, color: "#C9A961" }}>★</span>
+              <span style={{
+                fontFamily: "var(--font-mono)", fontSize: 9,
+                color: "#C9A961", letterSpacing: "0.12em", textTransform: "uppercase",
+              }}>
+                {enriched.festivalWins.slice(0, 2).join(" · ")}
+              </span>
+            </div>
+          )}
           <div style={{
             fontFamily: "var(--font-display)",
             fontSize: 28, color: "#F5F1EA", lineHeight: 1.05,

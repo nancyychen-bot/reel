@@ -1,10 +1,9 @@
 /**
  * One-time admin endpoint — retroactively assigns award_winner=true to arthouse
  * films already in the DB by re-scraping each festival's Wikipedia page for
- * every year represented in arthouse_films.
+ * recent years (not the film's release year, which is unrelated to the festival year).
  *
  * Usage: GET /api/admin/backfill-arthouse-awards
- * Processes all (festival × year) pairs in one shot (Vercel Pro, 300s limit).
  */
 
 import { NextRequest } from "next/server";
@@ -31,6 +30,11 @@ const FESTIVALS: Array<{ name: string; pageTitle: (y: number) => string }> = [
   { name: "Locarno",  pageTitle: (y) => `${y}_Locarno_Film_Festival` },
 ];
 
+// Check recent years — the cron adds films from current festival seasons,
+// so film release year is irrelevant; we need the festival's own year.
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS_TO_CHECK = Array.from({ length: CURRENT_YEAR - 2017 }, (_, i) => 2018 + i);
+
 async function fetchWikiPage(title: string): Promise<string | null> {
   try {
     const url = `https://en.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=text&formatversion=2&format=json`;
@@ -40,7 +44,6 @@ async function fetchWikiPage(title: string): Promise<string | null> {
   } catch { return null; }
 }
 
-/** Returns a Set of lowercased film titles found in award sections of this page. */
 function extractAwardTitles(html: string): Set<string> {
   const $ = cheerio.load(html);
   const awardTableEls = new Set<unknown>();
@@ -90,69 +93,75 @@ export async function GET(_: NextRequest) {
 
   const [{ data: arthouseRows }, { data: movieRows }] = await Promise.all([
     admin.from("arthouse_films").select("tmdb_id, festivals, award_winner"),
-    admin.from("movies").select("tmdb_id, title, year"),
+    admin.from("movies").select("tmdb_id, title"),
   ]);
 
   if (!arthouseRows?.length) {
     return Response.json({ message: "No arthouse films found.", updated: 0 });
   }
 
-  const movieMap = new Map<number, { title: string; year: number }>(
-    (movieRows ?? []).map((m: any) => [m.tmdb_id as number, { title: m.title as string, year: m.year as number }])
+  const movieMap = new Map<number, string>(
+    (movieRows ?? []).map((m: any) => [m.tmdb_id as number, m.title as string])
   );
 
-  // Collect unique (festival, year) pairs
-  const pairSet = new Set<string>();
+  // Collect unique (festivalName, year) pairs across all recent years for every
+  // festival that appears in arthouse_films — NOT based on movie release year.
+  const festivalsInUse = new Set<string>();
   for (const row of arthouseRows) {
-    const movie = movieMap.get(row.tmdb_id);
-    if (!movie?.year) continue;
-    for (const fest of (row.festivals ?? [])) {
-      pairSet.add(`${fest}::${movie.year}`);
+    for (const fest of (row.festivals ?? [])) festivalsInUse.add(fest);
+  }
+
+  const pairs: Array<{ festName: string; year: number; key: string }> = [];
+  for (const festName of festivalsInUse) {
+    for (const year of YEARS_TO_CHECK) {
+      pairs.push({ festName, year, key: `${festName}::${year}` });
     }
   }
-  const pairs = [...pairSet].sort();
 
   // Fetch all Wikipedia pages in parallel
   const awardTitlesByPair = new Map<string, Set<string>>();
-  await Promise.all(pairs.map(async (pair) => {
-    const [festName, yearStr] = pair.split("::");
+  await Promise.all(pairs.map(async ({ festName, year, key }) => {
     const festDef = FESTIVALS.find(f => f.name === festName);
-    if (!festDef) { awardTitlesByPair.set(pair, new Set()); return; }
-    const html = await fetchWikiPage(festDef.pageTitle(parseInt(yearStr)));
-    awardTitlesByPair.set(pair, html ? extractAwardTitles(html) : new Set());
+    if (!festDef) { awardTitlesByPair.set(key, new Set()); return; }
+    const html = await fetchWikiPage(festDef.pageTitle(year));
+    awardTitlesByPair.set(key, html ? extractAwardTitles(html) : new Set());
   }));
 
-  // Determine which films are award winners
+  // For each arthouse film, check if its title appears in ANY award section
+  // across all years of each festival it belongs to
   const toUpdate: number[] = [];
   for (const row of arthouseRows) {
     if (row.award_winner) continue;
-    const movie = movieMap.get(row.tmdb_id);
-    if (!movie) continue;
-    const normTitle = normalise(movie.title);
+    const title = movieMap.get(row.tmdb_id);
+    if (!title) continue;
+    const normTitle = normalise(title);
     let isWinner = false;
-    for (const fest of (row.festivals ?? [])) {
-      const awardTitles = awardTitlesByPair.get(`${fest}::${movie.year}`);
-      if (!awardTitles) continue;
-      for (const at of awardTitles) {
-        if (normalise(at) === normTitle) { isWinner = true; break; }
+
+    outer: for (const festName of (row.festivals ?? [])) {
+      for (const year of YEARS_TO_CHECK) {
+        const awardTitles = awardTitlesByPair.get(`${festName}::${year}`);
+        if (!awardTitles) continue;
+        for (const at of awardTitles) {
+          if (normalise(at) === normTitle) { isWinner = true; break outer; }
+        }
       }
-      if (isWinner) break;
     }
+
     if (isWinner) toUpdate.push(row.tmdb_id);
   }
 
   // Batch update
-  const CHUNK = 100;
-  for (let i = 0; i < toUpdate.length; i += CHUNK) {
-    await admin.from("arthouse_films").update({ award_winner: true }).in("tmdb_id", toUpdate.slice(i, i + CHUNK));
+  for (let i = 0; i < toUpdate.length; i += 100) {
+    await admin.from("arthouse_films").update({ award_winner: true }).in("tmdb_id", toUpdate.slice(i, i + 100));
   }
 
-  const pairSummary = [...awardTitlesByPair.entries()].map(([pair, titles]) => ({
-    pair, awardTitlesFound: titles.size,
-  }));
+  const pairSummary = [...awardTitlesByPair.entries()]
+    .filter(([, t]) => t.size > 0)
+    .map(([pair, titles]) => ({ pair, awardTitlesFound: titles.size }));
 
   return Response.json({
     pairsChecked: pairs.length,
+    pairsWithAwardData: pairSummary.length,
     pairSummary,
     arthouseTotal: arthouseRows.length,
     alreadyMarked: arthouseRows.filter((r: any) => r.award_winner).length,

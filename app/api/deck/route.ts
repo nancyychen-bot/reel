@@ -149,7 +149,7 @@ async function fetchFilteredDiscover(
 async function fetchPopularDiscover(
   genres: Genre[],
   special: Special[],
-  pages = 12,
+  pages = 20,
 ): Promise<FilmRecord[]> {
   if (!TMDB_KEY) return [];
 
@@ -165,7 +165,7 @@ async function fetchPopularDiscover(
     genrePart,
     ...dateParts,
     "vote_count.gte=100000",
-    "sort_by=vote_count.desc",
+    "sort_by=popularity.desc",
     "include_adult=false",
   ].filter(Boolean).join("&");
 

@@ -54,21 +54,48 @@ export async function GET(
   const participantIds = (participants ?? []).map((p: any) => p.user_id);
 
   async function getPrefs(uid: string): Promise<UserPrefs> {
-    const { data: prefs } = await supabase
-      .from("user_preferences")
-      .select("preferred_genres, favorite_film_tmdb_ids")
-      .eq("user_id", uid)
-      .maybeSingle();
+    const [{ data: prefs }, { data: swipes }] = await Promise.all([
+      supabase.from("user_preferences")
+        .select("preferred_genres, favorite_film_tmdb_ids")
+        .eq("user_id", uid)
+        .maybeSingle(),
+      supabase.from("swipes")
+        .select("imdb_id, direction")
+        .eq("user_id", uid)
+        .eq("direction", "like")
+        .order("created_at", { ascending: false })
+        .limit(60),
+    ]);
+
+    const recentLikedIds = (swipes ?? [])
+      .map((s: any) => s.imdb_id)
+      .filter((id: string) => isNaN(parseInt(id)));
 
     const seedTmdbIds: number[] = prefs?.favorite_film_tmdb_ids ?? [];
-    const { data: seedMovies } = seedTmdbIds.length > 0
-      ? await supabase.from("movies").select("genres, director").in("tmdb_id", seedTmdbIds)
-      : { data: [] as any[] };
+
+    const [{ data: likedMovies }, { data: seedMovies }] = await Promise.all([
+      recentLikedIds.length > 0
+        ? supabase.from("movies").select("genres, director").in("imdb_id", recentLikedIds)
+        : Promise.resolve({ data: [] as any[] }),
+      seedTmdbIds.length > 0
+        ? supabase.from("movies").select("genres, director").in("tmdb_id", seedTmdbIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const genreFreq    = new Map<string, number>();
+    const directorFreq = new Map<string, number>();
+    for (const m of likedMovies ?? []) {
+      for (const g of m.genres ?? []) genreFreq.set(g, (genreFreq.get(g) ?? 0) + 1);
+      if (m.director) directorFreq.set(m.director, (directorFreq.get(m.director) ?? 0) + 1);
+    }
+
+    const topGenres    = [...genreFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([g]) => g);
+    const topDirectors = [...directorFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([d]) => d);
 
     return {
       favoriteGenres: prefs?.preferred_genres ?? [],
-      seedGenres:     [...new Set((seedMovies ?? []).flatMap((m: any) => m.genres ?? []))],
-      seedDirectors:  [...new Set((seedMovies ?? []).map((m: any) => m.director).filter(Boolean))],
+      seedGenres:     [...new Set([...topGenres,    ...(seedMovies ?? []).flatMap((m: any) => m.genres ?? [])])],
+      seedDirectors:  [...new Set([...topDirectors, ...(seedMovies ?? []).map((m: any) => m.director).filter(Boolean)])],
     };
   }
 

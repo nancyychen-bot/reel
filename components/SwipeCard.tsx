@@ -67,6 +67,7 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
     rtScore?:      number;
     awards?:       string;
     festivalWins?: string[];
+    festivalNoms?: string[];
     director?:     string;
     runtime?:      number;
     language?:     string;
@@ -414,21 +415,31 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             )}
           </div>
 
-          {/* Festival award badges */}
-          {enriched?.festivalWins && enriched.festivalWins.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-              {enriched.festivalWins.map(award => (
-                <span key={award} style={{
-                  fontFamily: "var(--font-mono)", fontSize: 9,
-                  color: "#C9A961", border: "1px solid #C9A96155",
-                  borderRadius: 2, padding: "4px 10px",
-                  letterSpacing: "0.12em", textTransform: "uppercase",
-                  background: "#1c130855",
-                  whiteSpace: "nowrap",
-                }}>{award}</span>
-              ))}
+          {/* Festival awards — wins and nominations */}
+          {(enriched?.festivalWins?.length || enriched?.festivalNoms?.length) ? (
+            <div style={{ marginBottom: 18 }}>
+              {enriched?.festivalWins && enriched.festivalWins.length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#C9A961", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                    Won —{" "}
+                  </span>
+                  <span style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "#C9A961" }}>
+                    {enriched.festivalWins.join(", ")}
+                  </span>
+                </div>
+              )}
+              {enriched?.festivalNoms && enriched.festivalNoms.length > 0 && (
+                <div>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#5A5550", letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                    Nom. —{" "}
+                  </span>
+                  <span style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "#6a6560" }}>
+                    {enriched.festivalNoms.join(", ")}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+          ) : null}
 
           {/* Meta */}
           <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>
@@ -458,11 +469,10 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             </div>
           )}
 
-          {/* Awards */}
-          {(enriched?.awards ?? film.awards) && (
-            <div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 6 }}>AWARDS & RECOGNITION</div>
-              <p style={{ fontFamily: "var(--font-sans)", fontSize: 14, color: "#6a6560", lineHeight: 1.6 }}>{enriched?.awards ?? film.awards}</p>
+          {/* Awards summary — show concise wins/noms count if no specific festivals parsed */}
+          {!(enriched?.festivalWins?.length || enriched?.festivalNoms?.length) && (enriched?.awards ?? film.awards) && (
+            <div style={{ fontFamily: "var(--font-sans)", fontSize: 13, color: "#4a4a4a", lineHeight: 1.6 }}>
+              {enriched?.awards ?? film.awards}
             </div>
           )}
         </div>

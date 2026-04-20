@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Fetch in parallel: prefs + swipe history
+  // Fetch prefs + full swipe history in parallel
   const [{ data: prefs }, { data: swipes }] = await Promise.all([
     supabase
       .from("user_preferences")
@@ -118,32 +118,36 @@ export async function GET(request: NextRequest) {
       .eq("user_id", user.id),
   ]);
 
-  // Build swiped set for filtering
-  const swipedIds = new Set<number>();
-  const likedImdbIds: string[] = [];
-  (swipes ?? []).forEach((s: any) => {
-    const n = parseInt(s.imdb_id);
-    if (!isNaN(n)) swipedIds.add(n);
-    if (s.direction === "like") likedImdbIds.push(s.imdb_id);
-  });
+  const allSwipedImdbIds = (swipes ?? []).map((s: any) => s.imdb_id).filter(Boolean);
+  const likedImdbSet     = new Set((swipes ?? []).filter((s: any) => s.direction === "like").map((s: any) => s.imdb_id));
 
-  // Look up tmdb_ids for liked films (so we can hit the recommendations API)
-  const likedTmdbIds: number[] = [];
-  if (likedImdbIds.length > 0) {
-    const { data: likedMovies } = await supabase
+  // Fetch swiped tmdb_ids + DB pool in parallel.
+  // IMDb IDs like "tt0068646" can't be parsed as numbers — we must look them up.
+  // Every swiped film is in movies (the swipe route upserts it), so this covers all cases.
+  const [{ data: swipedMoviesData }, { data: dbPool }] = await Promise.all([
+    allSwipedImdbIds.length > 0
+      ? supabase
+          .from("movies")
+          .select("tmdb_id, imdb_id")
+          .in("imdb_id", allSwipedImdbIds.slice(0, 1000))
+      : Promise.resolve({ data: [] as any[] }),
+    supabase
       .from("movies")
-      .select("tmdb_id")
-      .in("imdb_id", likedImdbIds.slice(0, 20))
-      .order("tmdb_rating", { ascending: false });
-    (likedMovies ?? []).forEach((m: any) => likedTmdbIds.push(m.tmdb_id));
-  }
+      .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
+      .order("tmdb_rating", { ascending: false })
+      .limit(500),
+  ]);
 
-  // DB pool — our seeded films
-  const { data: dbPool } = await supabase
-    .from("movies")
-    .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
-    .order("tmdb_rating", { ascending: false })
-    .limit(500);
+  // Build swipedIds from real tmdb_ids (plus numeric fallback for placeholder imdb_ids)
+  const swipedIds = new Set<number>();
+  (swipedMoviesData ?? []).forEach((m: any) => swipedIds.add(m.tmdb_id));
+  allSwipedImdbIds.forEach((id: string) => { const n = parseInt(id); if (!isNaN(n)) swipedIds.add(n); });
+
+  // Liked tmdb_ids for personalised recommendations
+  const likedTmdbIds: number[] = (swipedMoviesData ?? [])
+    .filter((m: any) => likedImdbSet.has(m.imdb_id))
+    .map((m: any) => m.tmdb_id)
+    .slice(0, 20);
 
   const dbFilms: FilmRecord[] = (dbPool ?? []).map((f: any) =>
     tmdbResultToFilm(f, PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 0)

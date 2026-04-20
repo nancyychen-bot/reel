@@ -62,14 +62,15 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
   const [posterUrl, setPosterUrl]  = useState<string | null>(film.posterUrl || null);
   const [posterLoaded, setPosterLoaded] = useState(false);
   const [enriched, setEnriched] = useState<{
-    imdbId?:    string;
-    imdbRating?: number;
-    rtScore?:   number;
-    awards?:    string;
-    director?:  string;
-    runtime?:   number;
-    language?:  string;
-    country?:   string;
+    imdbId?:       string;
+    imdbRating?:   number;
+    rtScore?:      number;
+    awards?:       string;
+    festivalWins?: string[];
+    director?:     string;
+    runtime?:      number;
+    language?:     string;
+    country?:      string;
   } | null>(null);
 
   const visual = {
@@ -412,6 +413,22 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
               </div>
             )}
           </div>
+
+          {/* Festival award badges */}
+          {enriched?.festivalWins && enriched.festivalWins.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
+              {enriched.festivalWins.map(award => (
+                <span key={award} style={{
+                  fontFamily: "var(--font-mono)", fontSize: 9,
+                  color: "#C9A961", border: "1px solid #C9A96155",
+                  borderRadius: 2, padding: "4px 10px",
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  background: "#1c130855",
+                  whiteSpace: "nowrap",
+                }}>{award}</span>
+              ))}
+            </div>
+          )}
 
           {/* Meta */}
           <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>

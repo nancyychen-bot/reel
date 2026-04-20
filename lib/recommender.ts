@@ -68,7 +68,11 @@ export function buildDeck({
     const seedGenreMatch = f.genres.some(g => userPrefs.seedGenres.includes(g))
     if (seedDirectorMatch || seedGenreMatch) score += 2
 
-    if (f.tmdb_rating >= 7.5) score += 1
+    // Tiered prestige scoring — strongly favours acclaimed arthouse films
+    if      (f.tmdb_rating >= 8.5) score += 6
+    else if (f.tmdb_rating >= 8.0) score += 4
+    else if (f.tmdb_rating >= 7.8) score += 2
+    else if (f.tmdb_rating >= 7.5) score += 1
     if (f.list_count >= 2)    score += 2  // TMDB similarity recs get list_count=2
 
     return { film: f, score }
@@ -126,8 +130,11 @@ export function buildRoomDeck({
     let s = 0
     if (f.genres.some(g => prefs.favoriteGenres.includes(g))) s += 3
     if (prefs.seedDirectors.includes(f.director) || f.genres.some(g => prefs.seedGenres.includes(g))) s += 2
-    if (f.tmdb_rating >= 7.5) s += 1
-    if (f.list_count >= 2)    s += 1
+    if      (f.tmdb_rating >= 8.5) s += 6
+    else if (f.tmdb_rating >= 8.0) s += 4
+    else if (f.tmdb_rating >= 7.8) s += 2
+    else if (f.tmdb_rating >= 7.5) s += 1
+    if (f.list_count >= 2) s += 2
     return s
   }
 

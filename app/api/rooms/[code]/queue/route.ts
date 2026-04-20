@@ -81,7 +81,7 @@ export async function GET(
   // Live rooms should feel like a curated cinema programme.
   const { data: pool } = await supabase
     .from("movies")
-    .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
+    .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating, ebert_great_movie")
     .gte("tmdb_rating", 7.0)
     .order("tmdb_rating", { ascending: false })
     .limit(800);
@@ -97,15 +97,16 @@ export async function GET(
     plot:        f.plot ?? "",
     poster_url:  f.poster_url ?? "",
     tmdb_rating: f.tmdb_rating ?? 0,
-    list_count:  PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 1,
+    list_count:  f.ebert_great_movie ? 4 : PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 1,
   });
 
-  // Split: prestige at any quality, general only if 7.8+; filter by arthouse if requested
-  const allFilms    = (pool ?? [])
+  // Split: Ebert + prestige at any quality, general only if 7.8+; filter by arthouse if requested
+  const allFilms     = (pool ?? [])
     .filter((f: any) => !arthouseIds || arthouseIds.has(f.tmdb_id))
     .map(toFilmRecord);
-  const prestigePool = allFilms.filter(f => PRESTIGE_IDS.has(f.tmdb_id));
-  const generalPool  = allFilms.filter(f => !PRESTIGE_IDS.has(f.tmdb_id) && f.tmdb_rating >= 7.8);
+  const ebertOrPrestige = (f: FilmRecord) => f.list_count >= 3;
+  const prestigePool = allFilms.filter(ebertOrPrestige);
+  const generalPool  = allFilms.filter(f => !ebertOrPrestige(f) && f.tmdb_rating >= 7.8);
 
   const deckArgs = {
     swipedIds:  new Set<number>(),

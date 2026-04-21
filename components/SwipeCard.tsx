@@ -139,8 +139,8 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
         const dir = x > 0 ? "right" : "left";
         setExiting(dir);
         setTimeout(() => onSwipe(dir === "right" ? "like" : "pass", film), 430);
-      } else if (!details && y > 50 && absY > absX) {
-        // Swipe down (panel closed) — open panel
+      } else if (!details && y < -50 && absY > absX) {
+        // Swipe up (panel closed) — open panel
         setDetails(true);
         dragRef.current = { x: 0, y: 0 };
         setDragState({ x: 0, y: 0 });

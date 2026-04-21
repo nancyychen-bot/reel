@@ -282,10 +282,8 @@ export async function GET(request: NextRequest) {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   // Swipe history + prefs + watched — order swipes newest-first so recent likes weight more.
-  // Supabase enforces a server-side max_rows cap (default 1000) that overrides .limit().
-  // We use .range() with pagination: fetch the first page in parallel with prefs/watched,
-  // then fetch additional pages in parallel if we hit the cap.
-  const [{ data: prefs }, { data: swipesPage1 }, { data: watchedRows }] = await Promise.all([
+  // max_rows is set to 10000 in Supabase, so a single query covers all realistic swipe counts.
+  const [{ data: prefs }, { data: swipesData }, { data: watchedRows }] = await Promise.all([
     supabase.from("user_preferences")
       .select("preferred_genres, favorite_film_tmdb_ids")
       .eq("user_id", user.id)
@@ -294,22 +292,13 @@ export async function GET(request: NextRequest) {
       .select("imdb_id, direction, source")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .range(0, 999),
+      .limit(10000),
     supabase.from("watched")
       .select("imdb_id")
       .eq("user_id", user.id),
   ]);
 
-  // If page 1 returned exactly 1000 rows we've hit the cap — fetch more pages in parallel
-  let swipes = swipesPage1 ?? [];
-  if (swipes.length === 1000) {
-    const [p2, p3, p4] = await Promise.all([
-      supabase.from("swipes").select("imdb_id, direction, source").eq("user_id", user.id).order("created_at", { ascending: false }).range(1000, 1999),
-      supabase.from("swipes").select("imdb_id, direction, source").eq("user_id", user.id).order("created_at", { ascending: false }).range(2000, 2999),
-      supabase.from("swipes").select("imdb_id, direction, source").eq("user_id", user.id).order("created_at", { ascending: false }).range(3000, 3999),
-    ]);
-    swipes = [...swipes, ...(p2.data ?? []), ...(p3.data ?? []), ...(p4.data ?? [])];
-  }
+  const swipes = swipesData ?? [];
 
   // Room passes are temporary — don't permanently exclude them from the regular deck.
   // Room likes still count as seen (user already liked it).
@@ -408,9 +397,8 @@ export async function GET(request: NextRequest) {
   const MOVIE_SELECT = "tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating, ebert_great_movie";
 
   // Resolve real imdb_ids (tt...) → tmdb_id via movies table (swipes + watched).
-  // Use only IDs that appear in the swiped set, limited to avoid oversized URL.
   // We call .then() immediately so Supabase starts the HTTP request now (it's lazy otherwise).
-  const realImdbIds = allExcludedImdbIds.filter(id => isNaN(parseInt(id))).slice(0, 400);
+  const realImdbIds = allExcludedImdbIds.filter(id => isNaN(parseInt(id)));
   const swipedMoviesQuery: Promise<{ data: any[] | null }> = realImdbIds.length > 0
     ? (supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", realImdbIds) as any)
         .then((r: any) => r)   // kick off the request eagerly, before dbPool awaits

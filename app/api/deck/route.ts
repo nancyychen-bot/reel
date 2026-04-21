@@ -387,15 +387,20 @@ export async function GET(request: NextRequest) {
     const n = parseInt(id);
     if (!isNaN(n)) directTmdbIds.add(n);
   }
+  // Build the exclusion set here so it's available for pool-based dedup below
+  const excludedImdbSet = new Set(allExcludedImdbIds);
 
   // ── Build filter-aware DB query ──────────────────────────────────────────
   const MOVIE_SELECT = "tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating, ebert_great_movie";
 
   // Resolve real imdb_ids (tt...) → tmdb_id via movies table (swipes + watched).
-  const realImdbIds = allExcludedImdbIds.filter(id => isNaN(parseInt(id)));
-  const swipedMoviesPromise = realImdbIds.length > 0
-    ? supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", realImdbIds).limit(5000)
-    : Promise.resolve({ data: [] as any[] });
+  // Use only IDs that appear in the swiped set, limited to avoid oversized URL.
+  // We call .then() immediately so Supabase starts the HTTP request now (it's lazy otherwise).
+  const realImdbIds = allExcludedImdbIds.filter(id => isNaN(parseInt(id))).slice(0, 400);
+  const swipedMoviesQuery: Promise<{ data: any[] | null }> = realImdbIds.length > 0
+    ? (supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", realImdbIds) as any)
+        .then((r: any) => r)   // kick off the request eagerly, before dbPool awaits
+    : Promise.resolve({ data: [] });
 
   let dbPool: any[] = [];
 
@@ -419,10 +424,7 @@ export async function GET(request: NextRequest) {
       dbPool = data ?? [];
     }
   } else {
-    // Standard path: filter-aware query against the full movies table.
-    // Genre and year filters applied at DB level for a dense pool.
-    // Runtime filters (Short/Epic) rely on post-hoc matchesFilters because
-    // runtime_minutes is often null for non-seeded films; discover compensates.
+    // Standard path: run dbPool and swipedMovies lookup in parallel.
     let q = supabase
       .from("movies")
       .select(MOVIE_SELECT)
@@ -433,15 +435,24 @@ export async function GET(request: NextRequest) {
     if (filteredSpecial.includes("Classic"))  q = (q as any).lt("year", 1980).gt("year", 0);
     if (filteredSpecial.includes("Recent"))   q = (q as any).gte("year", CURRENT_YEAR - 3);
 
-    const { data } = await q;
+    const [{ data }] = await Promise.all([q, swipedMoviesQuery]);
     dbPool = data ?? [];
   }
 
-  const { data: swipedMoviesData } = await swipedMoviesPromise;
+  const { data: swipedMoviesData } = await swipedMoviesQuery;
 
-  // Build swipedIds: movies-table lookup (real imdb_ids) + direct numeric ids + session excludes
+  // Build swipedIds: movies-table lookup + direct numeric ids + session excludes
   const swipedIds = new Set<number>([...directTmdbIds, ...sessionExcludeIds]);
   (swipedMoviesData ?? []).forEach((m: any) => swipedIds.add(m.tmdb_id));
+
+  // Belt-and-suspenders: map swiped imdb_ids → tmdb_ids directly from the fetched pool.
+  // This costs zero extra queries and handles the case where the URL-based lookup above
+  // was truncated (large realImdbIds) or missed a film. Covers discover/rec dedup too.
+  for (const f of dbPool) {
+    if (f.imdb_id && f.tmdb_id && excludedImdbSet.has(f.imdb_id)) {
+      swipedIds.add(f.tmdb_id);
+    }
+  }
 
   const likedTmdbIds: number[] = (swipedMoviesData ?? [])
     .filter((m: any) => likedImdbSet.has(m.imdb_id))
@@ -450,9 +461,6 @@ export async function GET(request: NextRequest) {
 
   // DB films — Ebert Great Movies get the highest boost (list_count 4),
   // other prestige films get 3, rest get 0.
-  // Filter by both imdb_id and tmdb_id so swiped films are excluded even when
-  // the imdb_id → tmdb_id lookup (swipedMoviesPromise) is incomplete.
-  const excludedImdbSet = new Set(allExcludedImdbIds);
   const dbFilms: FilmRecord[] = dbPool
     .filter((f: any) => !excludedImdbSet.has(f.imdb_id) && !swipedIds.has(f.tmdb_id))
     .map((f: any) => tmdbResultToFilm(

@@ -443,7 +443,7 @@ export async function GET(request: NextRequest) {
       .from("movies")
       .select(MOVIE_SELECT)
       .order("tmdb_rating", { ascending: false })
-      .limit(hasRuntimeFilter ? 2000 : 600);
+      .limit(hasRuntimeFilter ? 3000 : 2000);
 
     if (genres.length > 0)                   q = (q as any).overlaps("genres", genres);
     if (filteredSpecial.includes("Classic"))  q = (q as any).lt("year", 1980).gt("year", 0);
@@ -496,8 +496,8 @@ export async function GET(request: NextRequest) {
       if (providerFilter) return fetchProviderDiscover(providerFilter, genres, filteredSpecial, 15);
       if (wantsPopular)   return fetchPopularDiscover(genres, filteredSpecial, 12);
       if (hasFilters)     return fetchFilteredDiscover(genres, filteredSpecial, 20);
-      if (dbFilms.length < 100 || page > 3)
-        return fetchBroadDiscover(15, (page - 1) * 60);
+      if (dbFilms.length < 200 || page > 2)
+        return fetchBroadDiscover(30, (page - 1) * 60);
       return Promise.resolve([] as FilmRecord[]);
     })(),
   ]);

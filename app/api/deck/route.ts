@@ -566,5 +566,15 @@ export async function GET(request: NextRequest) {
     posterUrl:  f.poster_url,
   }));
 
-  return Response.json({ films });
+  return Response.json({
+    films,
+    _debug: {
+      totalSwipes:    (swipes ?? []).length,
+      excludedIds:    swipedIds.size,
+      dbPoolBefore:   dbPool.length,
+      dbFilmsAfter:   dbFilms.length,
+      filmPoolSize:   filmPool.length,
+      serving:        films.length,
+    },
+  });
 }

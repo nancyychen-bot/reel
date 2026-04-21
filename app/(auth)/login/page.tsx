@@ -11,8 +11,8 @@ const input: React.CSSProperties = {
   color: "#F5F1EA",
   caretColor: "#F5F1EA",
   fontFamily: "var(--font-sans)",
-  fontSize: 13,
-  padding: "12px 14px",
+  fontSize: 16, // ≥16px prevents iOS Safari auto-zoom on focus
+  padding: "10px 14px",
   borderRadius: 2,
   marginBottom: 10,
   outline: "none",

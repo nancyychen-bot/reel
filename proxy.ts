@@ -25,12 +25,15 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use getSession (no network call) for the redirect check — fast path.
+  // API routes verify tokens independently via getUser() for security.
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   const { pathname } = request.nextUrl
 
   // Auth-required routes — redirect to login if not authed, preserving destination
-  const appRoutes = ['/swipe', '/friends', '/rooms', '/room', '/lists', '/settings']
+  const appRoutes = ['/swipe', '/friends', '/rooms', '/room', '/lists', '/settings', '/account']
   const isAppRoute = appRoutes.some(r => pathname.startsWith(r))
 
   if (isAppRoute && !user) {

@@ -7,6 +7,7 @@ import SwipeDeck from "@/components/SwipeDeck";
 import MatchModal, { type MatchFilm } from "@/components/MatchModal";
 import type { FilmData } from "@/components/SwipeCard";
 import { GENRES, SPECIAL, type Genre, type Special } from "@/lib/filters";
+import { STREAMING_PROVIDERS } from "@/lib/providers";
 
 type Phase = "loading" | "waiting" | "selecting" | "swiping";
 
@@ -42,8 +43,10 @@ export default function LiveRoomPage() {
   const [partnerName, setPartnerName] = useState("");
   const [partnerId, setPartnerId]     = useState<string | null>(null);
   const [starting, setStarting]   = useState(false);
-  const [selectedGenres,  setSelectedGenres]  = useState<Set<Genre>>(new Set());
-  const [selectedSpecial, setSelectedSpecial] = useState<Set<Special>>(new Set());
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedGenres,    setSelectedGenres]    = useState<Set<Genre>>(new Set());
+  const [selectedSpecial,   setSelectedSpecial]   = useState<Set<Special>>(new Set());
+  const [selectedProviders, setSelectedProviders] = useState<Set<number>>(new Set());
 
   const supabase          = createClient();
   const channelRef        = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -94,7 +97,7 @@ export default function LiveRoomPage() {
       if (r.status === "active" && r.queue_imdb_ids?.length) {
         // Room already has a queue — load it and go straight to swiping
         await loadFilmsFromRoom(r);
-      } else if ((count ?? 0) >= 2) {
+      } else if (host || (count ?? 0) >= 2) {
         setPhase("selecting");
       } else {
         setPhase("waiting");
@@ -225,19 +228,25 @@ export default function LiveRoomPage() {
     if (pid) loadExistingMatches(pid);
   }
 
-  async function startSwiping() {
+  async function startSwiping(reset = false) {
     if (!room || !isHost) return;
     setStarting(true);
 
-    // Save genre/special tags to room
-    const tags = [...Array.from(selectedGenres), ...Array.from(selectedSpecial)];
+    // Save genre/special/provider tags to room
+    const tags = [
+      ...Array.from(selectedGenres),
+      ...Array.from(selectedSpecial),
+      ...Array.from(selectedProviders).map(id => `provider:${id}`),
+    ];
     await supabase.from("rooms").update({ mood_tags: tags }).eq("id", room.id);
 
     // Host generates the queue — stored on the room row so non-host can fetch it.
-    const res = await fetch(`/api/rooms/${code}/queue`);
+    // Pass ?reset=1 when rebuilding mid-session to bypass the cached queue.
+    const res = await fetch(`/api/rooms/${code}/queue${reset ? "?reset=1" : ""}`);
     const data = await res.json();
     setFilms(data.films ?? []);
     setPhase("swiping");
+    setShowFilters(false);
     setStarting(false);
 
     // Broadcast "start" so the non-host knows to load the queue immediately
@@ -312,6 +321,9 @@ export default function LiveRoomPage() {
   }
   function toggleSpecial(s: Special) {
     setSelectedSpecial(prev => { const n = new Set(prev); n.has(s) ? n.delete(s) : n.add(s); return n; });
+  }
+  function toggleProvider(id: number) {
+    setSelectedProviders(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
   // ── Render ─────────────────────────────────────────────────
@@ -422,7 +434,7 @@ export default function LiveRoomPage() {
               </div>
 
               {/* Genre filters */}
-              <div style={{ marginBottom: 28 }}>
+              <div style={{ marginBottom: 24 }}>
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#2e2e2e", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Genre</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {GENRES.map(g => {
@@ -443,9 +455,31 @@ export default function LiveRoomPage() {
                 </div>
               </div>
 
+              {/* Streaming filters */}
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#2e2e2e", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Streaming</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {STREAMING_PROVIDERS.map(p => {
+                    const on = selectedProviders.has(p.id);
+                    return (
+                      <button key={p.id} onClick={() => toggleProvider(p.id)} style={{
+                        background: on ? `${p.color}22` : "transparent",
+                        border: `1px solid ${on ? `${p.color}88` : "#252525"}`,
+                        borderRadius: 2, padding: "7px 13px",
+                        color: on ? p.color : "#3a3a3a",
+                        fontFamily: "var(--font-sans)", fontSize: 11,
+                        cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s ease",
+                      }}>
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Start button */}
               <button
-                onClick={startSwiping}
+                onClick={() => startSwiping(false)}
                 disabled={starting}
                 style={{
                   width: "100%",
@@ -485,14 +519,30 @@ export default function LiveRoomPage() {
       {/* ── Swiping ── */}
       {phase === "swiping" && (
         <>
-          {/* Sub-header: partner name + See Matches button */}
+          {/* Sub-header: partner name + Filters (host) + See Matches */}
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "6px 16px 2px", flexShrink: 0,
+            padding: "6px 16px 2px", flexShrink: 0, gap: 6,
           }}>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#3A3A3A", letterSpacing: "0.12em" }}>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#3A3A3A", letterSpacing: "0.12em", flex: 1 }}>
               {partnerName ? <>Swiping with <span style={{ color: "#5A5550" }}>@{partnerName}</span></> : ""}
             </div>
+            {isHost && (
+              <button
+                onClick={() => setShowFilters(true)}
+                style={{
+                  background: (selectedGenres.size + selectedSpecial.size) > 0 ? "#1a1408" : "transparent",
+                  border: `1px solid ${(selectedGenres.size + selectedSpecial.size) > 0 ? "#C9A96140" : "rgba(245,241,234,0.08)"}`,
+                  borderRadius: 2,
+                  color: (selectedGenres.size + selectedSpecial.size) > 0 ? "#C9A961" : "#3A3A3A",
+                  fontFamily: "var(--font-mono)", fontSize: 9,
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  padding: "5px 10px", cursor: "pointer",
+                }}
+              >
+                Filters{(selectedGenres.size + selectedSpecial.size) > 0 ? ` · ${selectedGenres.size + selectedSpecial.size}` : ""}
+              </button>
+            )}
             <button
               onClick={() => setShowMatchList(true)}
               style={{
@@ -500,15 +550,10 @@ export default function LiveRoomPage() {
                 border: `1px solid ${matchedFilms.length > 0 ? "#C9A96140" : "rgba(245,241,234,0.08)"}`,
                 borderRadius: 2,
                 color: matchedFilms.length > 0 ? "#C9A961" : "#3A3A3A",
-                fontFamily: "var(--font-mono)",
-                fontSize: 9,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                padding: "5px 10px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
+                fontFamily: "var(--font-mono)", fontSize: 9,
+                letterSpacing: "0.12em", textTransform: "uppercase",
+                padding: "5px 10px", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 5,
               }}
             >
               ♥ {matchedFilms.length} {matchedFilms.length === 1 ? "Match" : "Matches"}
@@ -531,6 +576,137 @@ export default function LiveRoomPage() {
             />
           )}
         </>
+      )}
+
+      {/* ── Filter overlay (host only, during swiping) ── */}
+      {showFilters && (
+        <div
+          onClick={() => setShowFilters(false)}
+          style={{
+            position: "absolute", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(8px)",
+            display: "flex", flexDirection: "column",
+            justifyContent: "flex-end",
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#0E0E0E",
+              border: "1px solid rgba(245,241,234,0.08)",
+              borderRadius: "4px 4px 0 0",
+              maxHeight: "80vh",
+              display: "flex", flexDirection: "column",
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "18px 20px 14px",
+              borderBottom: "1px solid rgba(245,241,234,0.06)",
+              flexShrink: 0,
+            }}>
+              <div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 8, color: "#5A5550", letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 3 }}>
+                  Change filters
+                </div>
+                <div style={{ fontFamily: "var(--font-serif)", fontSize: 20, fontStyle: "italic", color: "#F5F1EA" }}>
+                  Rebuild the queue
+                </div>
+              </div>
+              <button
+                onClick={() => setShowFilters(false)}
+                style={{ background: "none", border: "none", color: "#5A5550", fontSize: 22, cursor: "pointer", padding: "4px 6px", lineHeight: 1 }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Filter body */}
+            <div style={{ overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "20px 20px 0" } as React.CSSProperties}>
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#2e2e2e", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Type</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {SPECIAL.map(s => {
+                    const on = selectedSpecial.has(s);
+                    return (
+                      <button key={s} onClick={() => toggleSpecial(s)} style={{
+                        background: on ? "#1c1308" : "transparent",
+                        border: `1px solid ${on ? "#C9A96155" : "#252525"}`,
+                        borderRadius: 2, padding: "7px 13px",
+                        color: on ? "#C9A961" : "#3a3a3a",
+                        fontFamily: "var(--font-sans)", fontSize: 11,
+                        cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s ease",
+                      }}>
+                        {SPECIAL_LABELS[s]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#2e2e2e", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Genre</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {GENRES.map(g => {
+                    const on = selectedGenres.has(g);
+                    return (
+                      <button key={g} onClick={() => toggleGenre(g)} style={{
+                        background: on ? "#1c1308" : "transparent",
+                        border: `1px solid ${on ? "#C9A96155" : "#252525"}`,
+                        borderRadius: 2, padding: "7px 13px",
+                        color: on ? "#C9A961" : "#3a3a3a",
+                        fontFamily: "var(--font-sans)", fontSize: 11,
+                        cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s ease",
+                      }}>
+                        {g}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "#2e2e2e", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>Streaming</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {STREAMING_PROVIDERS.map(p => {
+                    const on = selectedProviders.has(p.id);
+                    return (
+                      <button key={p.id} onClick={() => toggleProvider(p.id)} style={{
+                        background: on ? `${p.color}22` : "transparent",
+                        border: `1px solid ${on ? `${p.color}88` : "#252525"}`,
+                        borderRadius: 2, padding: "7px 13px",
+                        color: on ? p.color : "#3a3a3a",
+                        fontFamily: "var(--font-sans)", fontSize: 11,
+                        cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s ease",
+                      }}>
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Apply button */}
+            <div style={{ padding: "16px 20px 28px", flexShrink: 0 }}>
+              <button
+                onClick={() => startSwiping(true)}
+                disabled={starting}
+                style={{
+                  width: "100%",
+                  background: "#8B2A2A", border: "none", color: "#F5F1EA",
+                  fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.18em",
+                  textTransform: "uppercase", padding: "16px",
+                  cursor: starting ? "not-allowed" : "pointer",
+                  borderRadius: 2, opacity: starting ? 0.6 : 1,
+                  transition: "opacity 0.2s",
+                }}
+              >
+                {starting ? "Building queue…" : "Apply & rebuild queue →"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Match list modal ── */}

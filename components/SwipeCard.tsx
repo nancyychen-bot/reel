@@ -59,20 +59,24 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
   const [dragging, setDragging] = useState(false);
   const [exiting,  setExiting]  = useState<"left" | "right" | null>(null);
   const [details,  setDetails]  = useState(false);
+  const panelTouchStartY = useRef(0);
   const [posterUrl, setPosterUrl]  = useState<string | null>(film.posterUrl || null);
   const [posterLoaded, setPosterLoaded] = useState(false);
   const [enriched, setEnriched] = useState<{
-    imdbId?:       string;
-    imdbRating?:   number;
-    rtScore?:      number;
-    awards?:       string;
-    festivalWins?: string[];
-    festivalNoms?: string[];
-    director?:     string;
-    runtime?:      number;
-    language?:     string;
-    country?:      string;
+    imdbId?:            string;
+    imdbRating?:        number;
+    rtScore?:           number;
+    awards?:            string;
+    festivalWins?:      string[];
+    festivalNoms?:      string[];
+    director?:          string;
+    runtime?:           number;
+    language?:          string;
+    country?:           string;
+    trailerKey?:        string;
+    streamingProviders?: Array<{ id: number; name: string }>;
   } | null>(null);
+  const [trailerOpen, setTrailerOpen] = useState(false);
 
   const visual = {
     bg:     film.bg     ?? deriveAccent(film.title).bg,
@@ -319,24 +323,40 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
           background: "#0A0A0A", borderTop: "1px solid #181818",
           padding: "14px 20px 16px", zIndex: 5,
         }}>
-          {/* Festival badge — shown once OMDB enrichment loads */}
-          {enriched?.festivalWins && enriched.festivalWins.length > 0 && (
-            <div style={{
-              display: "inline-flex", alignItems: "center", gap: 4,
-              background: "rgba(201,169,97,0.10)",
-              border: "1px solid rgba(201,169,97,0.30)",
-              borderRadius: 2, padding: "2px 7px",
-              marginBottom: 5,
-            }}>
-              <span style={{ fontSize: 9, color: "#C9A961" }}>★</span>
-              <span style={{
-                fontFamily: "var(--font-mono)", fontSize: 9,
-                color: "#C9A961", letterSpacing: "0.12em", textTransform: "uppercase",
-              }}>
-                {enriched.festivalWins.slice(0, 2).join(" · ")}
-              </span>
+          {/* Badges row — festival wins + streaming providers */}
+          {(enriched?.festivalWins?.length || enriched?.streamingProviders?.length) ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5, flexWrap: "wrap" }}>
+              {enriched?.festivalWins && enriched.festivalWins.length > 0 && (
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  background: "rgba(201,169,97,0.10)",
+                  border: "1px solid rgba(201,169,97,0.30)",
+                  borderRadius: 2, padding: "2px 7px",
+                }}>
+                  <span style={{ fontSize: 9, color: "#C9A961" }}>★</span>
+                  <span style={{
+                    fontFamily: "var(--font-mono)", fontSize: 9,
+                    color: "#C9A961", letterSpacing: "0.12em", textTransform: "uppercase",
+                  }}>
+                    {enriched.festivalWins.slice(0, 2).join(" · ")}
+                  </span>
+                </div>
+              )}
+              {enriched?.streamingProviders?.slice(0, 3).map(p => (
+                <div key={p.id} style={{
+                  fontFamily: "var(--font-mono)", fontSize: 9,
+                  letterSpacing: "0.10em", textTransform: "uppercase",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  borderRadius: 2, padding: "2px 7px",
+                  color: "#888",
+                  whiteSpace: "nowrap",
+                }}>
+                  {p.name}
+                </div>
+              ))}
             </div>
-          )}
+          ) : null}
           <div style={{
             fontFamily: "var(--font-display)",
             fontSize: 28, color: "#F5F1EA", lineHeight: 1.05,
@@ -403,12 +423,49 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             backdropFilter: "blur(24px) brightness(0.7)",
             backgroundColor: "rgba(8,8,8,0.94)",
             transition: "bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)",
-            padding: "50px 22px 24px",
+            padding: "0 22px 24px",
             zIndex: 10,
             overflowY: "auto",
           }}
           onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => {
+            panelTouchStartY.current = e.touches[0].clientY;
+          }}
+          onTouchEnd={e => {
+            const dy = e.changedTouches[0].clientY - panelTouchStartY.current;
+            const el = e.currentTarget as HTMLDivElement;
+            // Swipe down from top of panel → close
+            if (dy > 50 && el.scrollTop <= 2) setDetails(false);
+          }}
         >
+          {/* Drag handle */}
+          <div style={{
+            width: 36, height: 4, borderRadius: 2,
+            background: "#2a2a2a",
+            margin: "12px auto 16px",
+          }} />
+
+          {/* Film header — title, year, director */}
+          <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid #1a1a1a" }}>
+            <div style={{
+              fontFamily: "var(--font-display)",
+              fontSize: 20, color: "#F5F1EA",
+              textTransform: "uppercase", letterSpacing: "0.01em",
+              lineHeight: 1.05, marginBottom: 5,
+            }}>
+              {film.title}
+            </div>
+            <div style={{
+              fontFamily: "var(--font-mono)", fontSize: 11,
+              color: "#5A5550", letterSpacing: "0.08em",
+            }}>
+              {film.year}
+              {(enriched?.director ?? film.director) && (enriched?.director ?? film.director) !== "Unknown"
+                ? ` · ${enriched?.director ?? film.director}`
+                : ""}
+            </div>
+          </div>
+
           <p style={{
             fontFamily: "var(--font-sans)", fontSize: 15,
             color: "#9A9590", lineHeight: 1.7, marginBottom: 20,
@@ -416,25 +473,78 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             {film.plot}
           </p>
 
-          {/* Ratings */}
-          <div style={{ display: "flex", gap: 24, marginBottom: 18, flexWrap: "wrap" }}>
-            {enriched?.imdbRating != null && (
-              <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>IMDb</div>
+          {/* Ratings + Letterboxd + Trailer */}
+          <div style={{ marginBottom: 18 }}>
+            {/* Labels row — IMDb · RT · action buttons all on the same baseline */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ display: "flex", gap: 24 }}>
+                {enriched?.imdbRating != null && (
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em" }}>IMDb</div>
+                )}
+                {enriched?.rtScore != null && (
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em" }}>Rotten Tomatoes</div>
+                )}
+                {enriched === null && isTop && (
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#2a2a2a", letterSpacing: "0.12em" }}>
+                    Loading ratings…
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {enriched?.trailerKey && (
+                  <button
+                    onMouseDown={e => e.stopPropagation()}
+                    onTouchStart={e => e.stopPropagation()}
+                    onClick={() => setTrailerOpen(true)}
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      letterSpacing: "0.14em",
+                      textTransform: "uppercase",
+                      color: "#C9A961",
+                      background: "rgba(201,169,97,0.08)",
+                      border: "1px solid rgba(201,169,97,0.25)",
+                      borderRadius: 2,
+                      padding: "4px 10px",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ▶ Trailer
+                  </button>
+                )}
+                <a
+                  href={`https://letterboxd.com/tmdb/${film.tmdbId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onMouseDown={e => e.stopPropagation()}
+                  onTouchStart={e => e.stopPropagation()}
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "#5A5550",
+                    border: "1px solid #222",
+                    borderRadius: 2,
+                    padding: "4px 10px",
+                    textDecoration: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Letterboxd ↗
+                </a>
+              </div>
+            </div>
+            {/* Numbers row */}
+            <div style={{ display: "flex", gap: 24 }}>
+              {enriched?.imdbRating != null && (
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched.imdbRating.toFixed(1)}</div>
-              </div>
-            )}
-            {enriched?.rtScore != null && (
-              <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em", marginBottom: 3 }}>Rotten Tomatoes</div>
+              )}
+              {enriched?.rtScore != null && (
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched.rtScore}%</div>
-              </div>
-            )}
-            {enriched === null && isTop && (
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#2a2a2a", letterSpacing: "0.12em", alignSelf: "center" }}>
-                Loading ratings…
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Festival awards — wins and nominations */}
@@ -466,7 +576,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
           {/* Meta */}
           <div style={{ display: "flex", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>
             {[
-              ["DIRECTOR", enriched?.director ?? (film.director !== "Unknown" ? film.director : "")],
               ["RUNTIME",  (enriched?.runtime ?? film.runtime) ? `${enriched?.runtime ?? film.runtime} min` : ""],
               ["LANGUAGE", enriched?.language ?? film.language ?? ""],
               ["COUNTRY",  enriched?.country  ?? film.country  ?? ""],
@@ -498,30 +607,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             </div>
           )}
 
-          {/* Learn More → Rotten Tomatoes */}
-          <a
-            href={`https://www.rottentomatoes.com/search?search=${encodeURIComponent(film.title)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-block",
-              marginTop: 20,
-              fontFamily: "var(--font-mono)",
-              fontSize: 10,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "#5A5550",
-              border: "1px solid #222",
-              borderRadius: 2,
-              padding: "7px 14px",
-              textDecoration: "none",
-              transition: "color 0.15s, border-color 0.15s",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#C9A961"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "#C9A96140"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#5A5550"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "#222"; }}
-          >
-            Learn More ↗
-          </a>
         </div>
 
         {/* Detail toggle */}
@@ -546,6 +631,58 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
           >
             {details ? "▲  LESS" : "▼  MORE"}
           </button>
+        )}
+
+        {/* Trailer modal */}
+        {trailerOpen && enriched?.trailerKey && (
+          <div
+            onMouseDown={e => e.stopPropagation()}
+            onTouchStart={e => e.stopPropagation()}
+            onClick={() => setTrailerOpen(false)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 50,
+              background: "rgba(0,0,0,0.92)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+            }}
+          >
+            {/* Stop click-through from closing when tapping the iframe */}
+            <div
+              onClick={e => e.stopPropagation()}
+              onMouseDown={e => e.stopPropagation()}
+              onTouchStart={e => e.stopPropagation()}
+              style={{ width: "100%", aspectRatio: "16/9" }}
+            >
+              <iframe
+                src={`https://www.youtube.com/embed/${enriched.trailerKey}?autoplay=1&rel=0&modestbranding=1`}
+                allow="autoplay; encrypted-media; fullscreen"
+                allowFullScreen
+                style={{ width: "100%", height: "100%", border: "none" }}
+              />
+            </div>
+            <button
+              onClick={() => setTrailerOpen(false)}
+              style={{
+                background: "none",
+                border: "1px solid #333",
+                borderRadius: 2,
+                color: "#5A5550",
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                padding: "6px 18px",
+                cursor: "pointer",
+              }}
+            >
+              Close
+            </button>
+          </div>
         )}
       </div>
     </div>

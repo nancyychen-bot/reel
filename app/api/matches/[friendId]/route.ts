@@ -8,39 +8,47 @@ export async function GET(
 ) {
   const { friendId } = await params;
 
-  // Verify the requesting user is authenticated
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Use admin client to bypass RLS — matches may be invisible when current user is user_b
   const admin = createAdminClient();
 
+  // Compute matches from swipe intersection — catches all retroactive likes
+  // that were never written to the matches table at swipe-time.
+  const [{ data: myLikes }, { data: theirLikes }] = await Promise.all([
+    supabase.from("swipes").select("imdb_id").eq("user_id", user.id).eq("direction", "like"),
+    admin.from("swipes").select("imdb_id").eq("user_id", friendId).eq("direction", "like"),
+  ]);
+
+  const mySet = new Set((myLikes ?? []).map((s: any) => s.imdb_id));
+  const commonImdbIds = (theirLikes ?? [])
+    .map((s: any) => s.imdb_id)
+    .filter((id: string) => mySet.has(id));
+
+  if (commonImdbIds.length === 0) return Response.json({ matches: [] });
+
+  // Backfill matches table so future swipe-time checks stay consistent
   const [ua, ub] = [user.id, friendId].sort();
-  const { data: ms } = await admin
-    .from("matches")
-    .select("imdb_id, matched_at")
-    .eq("user_a", ua)
-    .eq("user_b", ub)
-    .order("matched_at", { ascending: false });
+  void admin.from("matches").upsert(
+    commonImdbIds.map((imdb_id: string) => ({ user_a: ua, user_b: ub, imdb_id, context: "backfill" })),
+    { onConflict: "user_a,user_b,imdb_id", ignoreDuplicates: true }
+  ); // fire-and-forget
 
-  const imdbIds = (ms ?? []).map((m: any) => m.imdb_id);
-  let movies: any[] = [];
-  if (imdbIds.length > 0) {
-    const { data } = await admin
-      .from("movies")
-      .select("tmdb_id, imdb_id, title, year, poster_url, director, runtime_minutes, genres, plot, tmdb_rating")
-      .in("imdb_id", imdbIds);
-    movies = data ?? [];
-  }
+  // Fetch movie data for all matched films
+  const { data: movies } = await admin
+    .from("movies")
+    .select("tmdb_id, imdb_id, title, year, poster_url, director, runtime_minutes, genres, plot, tmdb_rating")
+    .in("imdb_id", commonImdbIds);
 
-  const movieMap = new Map(movies.map(m => [m.imdb_id, m]));
-  const matches = (ms ?? []).map((m: any) => {
-    const mv = movieMap.get(m.imdb_id);
+  const movieMap = new Map((movies ?? []).map((m: any) => [m.imdb_id, m]));
+
+  const matches = commonImdbIds.map((imdb_id: string) => {
+    const mv = movieMap.get(imdb_id);
     return {
-      imdb_id:    m.imdb_id,
+      imdb_id,
       tmdbId:     mv?.tmdb_id,
-      title:      mv?.title ?? m.imdb_id,
+      title:      mv?.title ?? imdb_id,
       year:       mv?.year ?? 0,
       posterUrl:  mv?.poster_url ?? "",
       director:   mv?.director ?? "",
@@ -48,7 +56,7 @@ export async function GET(
       genres:     mv?.genres ?? [],
       plot:       mv?.plot ?? "",
       tmdbRating: mv?.tmdb_rating ?? 0,
-      matchedAt:  m.matched_at,
+      matchedAt:  new Date().toISOString(),
     };
   });
 

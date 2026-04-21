@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Returns all matches for the current user, with movie info and friend username.
-// Uses admin client to bypass RLS (which only allows user_a to read their matches).
+// Returns all matches for the current user by intersecting liked swipes.
+// This catches retroactive matches (films both users liked before becoming friends)
+// that were never written to the matches table at swipe-time.
 export async function GET(_: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -11,41 +12,40 @@ export async function GET(_: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Fetch all matches where user appears as either user_a or user_b
-  const { data: ms } = await admin
-    .from("matches")
-    .select("imdb_id, matched_at, user_a, user_b")
-    .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-    .order("matched_at", { ascending: false });
+  // Get accepted friends
+  const { data: fs } = await supabase
+    .from("friendships")
+    .select("user_id, friend_id")
+    .eq("status", "accepted")
+    .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
 
-  if (!ms || ms.length === 0) return Response.json({ matches: [] });
+  if (!fs || fs.length === 0) return Response.json({ matches: [] });
 
-  const imdbIds   = [...new Set(ms.map((m: any) => m.imdb_id))];
-  const friendIds = [...new Set(ms.map((m: any) => m.user_a === user.id ? m.user_b : m.user_a))];
+  const friendIds = fs.map(f => f.user_id === user.id ? f.friend_id : f.user_id);
 
-  // Fetch movies + friend profiles in parallel
-  const [{ data: movies }, { data: profiles }] = await Promise.all([
-    admin.from("movies").select("imdb_id, title, year, poster_url").in("imdb_id", imdbIds),
-    admin.from("profiles").select("id, username").in("id", friendIds),
+  // Fetch current user's likes + all friends' likes in parallel (2 queries total)
+  const [{ data: myLikes }, { data: friendLikes }] = await Promise.all([
+    supabase.from("swipes").select("imdb_id").eq("user_id", user.id).eq("direction", "like"),
+    admin.from("swipes").select("user_id, imdb_id").in("user_id", friendIds).eq("direction", "like"),
   ]);
 
-  const movieMap   = new Map((movies   ?? []).map((m: any) => [m.imdb_id, m]));
-  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+  const myLikedSet = new Set((myLikes ?? []).map((s: any) => s.imdb_id));
 
-  const matches = ms.map((m: any) => {
-    const friendId = m.user_a === user.id ? m.user_b : m.user_a;
-    const movie    = movieMap.get(m.imdb_id);
-    const friend   = profileMap.get(friendId);
-    return {
-      imdb_id:    m.imdb_id,
-      title:      movie?.title    ?? m.imdb_id,
-      year:       movie?.year     ?? 0,
-      posterUrl:  movie?.poster_url ?? "",
-      matchedAt:  m.matched_at,
-      friendId,
-      friendName: friend?.username ?? "friend",
-    };
-  });
+  // Group friend likes by user_id, then intersect with mine
+  const likesByFriend = new Map<string, string[]>();
+  for (const s of friendLikes ?? []) {
+    if (!likesByFriend.has(s.user_id)) likesByFriend.set(s.user_id, []);
+    likesByFriend.get(s.user_id)!.push(s.imdb_id);
+  }
+
+  const matches: Array<{ friendId: string; imdb_id: string }> = [];
+  for (const [friendId, theirLikes] of likesByFriend) {
+    for (const imdbId of theirLikes) {
+      if (myLikedSet.has(imdbId)) {
+        matches.push({ friendId, imdb_id: imdbId });
+      }
+    }
+  }
 
   return Response.json({ matches });
 }

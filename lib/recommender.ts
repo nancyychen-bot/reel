@@ -141,27 +141,25 @@ export function buildDeck({
   return diverse.slice(0, count)
 }
 
-/** For live rooms — scores combine both users' profiles. */
+/** For live rooms — scores combine all participants' profiles. */
 export function buildRoomDeck({
   pool,
   swipedIds,
   watchedIds,
-  userAPrefs,
-  userBPrefs,
+  allUserPrefs,
   moods,
   genres,
   special,
   count = 50,
 }: {
-  pool:       FilmRecord[]
-  swipedIds:  Set<number>
-  watchedIds: Set<number>
-  userAPrefs: UserPrefs
-  userBPrefs: UserPrefs
-  moods:      Mood[]
-  genres?:    Genre[]
-  special?:   Special[]
-  count?:     number
+  pool:         FilmRecord[]
+  swipedIds:    Set<number>
+  watchedIds:   Set<number>
+  allUserPrefs: UserPrefs[]
+  moods:        Mood[]
+  genres?:      Genre[]
+  special?:     Special[]
+  count?:       number
 }): FilmRecord[] {
   let candidates = pool.filter(
     f => !swipedIds.has(f.tmdb_id) && !watchedIds.has(f.tmdb_id)
@@ -178,7 +176,7 @@ export function buildRoomDeck({
   }
 
   const scored = candidates
-    .map(f => ({ film: f, score: scoreFilm(f, userAPrefs) + scoreFilm(f, userBPrefs) }))
+    .map(f => ({ film: f, score: allUserPrefs.reduce((sum, prefs) => sum + scoreFilm(f, prefs), 0) }))
     .sort((a, b) => b.score - a.score)
 
   const ranked  = scored.slice(0, 100).map(s => s.film)

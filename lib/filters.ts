@@ -27,6 +27,7 @@ export function matchesFilters(
       if (s === 'Epic')    return film.runtime >= 150
       if (s === 'Classic') return film.year > 0 && film.year < 1980
       if (s === 'Recent')  return film.year >= new Date().getFullYear() - 3
+      if (s === 'Popular') return true
       return false
     })
     if (!ok) return false

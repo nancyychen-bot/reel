@@ -8,8 +8,9 @@ import type { FilmData } from "@/components/SwipeCard";
 import { type Genre, type Special } from "@/lib/filters";
 
 export default function SwipePage() {
-  const [genres,  setGenres]  = useState<Set<Genre>>(new Set());
-  const [special, setSpecial] = useState<Set<Special>>(new Set());
+  const [genres,    setGenres]    = useState<Set<Genre>>(new Set());
+  const [special,   setSpecial]   = useState<Set<Special>>(new Set());
+  const [providers, setProviders] = useState<Set<number>>(new Set());
   const [filtersReady, setFiltersReady] = useState(false);
   const [filterOpen, setFilterOpen]     = useState(false);
   const [films, setFilms]   = useState<FilmData[]>([]);
@@ -18,8 +19,7 @@ export default function SwipePage() {
   const [match, setMatch]     = useState<MatchFilm | null>(null);
   const [showHint, setShowHint] = useState(false);
 
-  // Client-side record of every tmdbId swiped this session — used to
-  // deduplicate incoming batches before DB swipes are fully committed.
+  // tmdbIds swiped this session — excludes async swipes not yet committed to DB.
   const swipedIds = useRef(new Set<number>());
 
   // Show first-time hint
@@ -30,13 +30,15 @@ export default function SwipePage() {
     }
   }, []);
 
-  // Load session-stored filters on mount
+  // Load session-stored filters and seen IDs on mount
   useEffect(() => {
     try {
       const g = sessionStorage.getItem("reel_genres");
       const s = sessionStorage.getItem("reel_special");
+      const p = sessionStorage.getItem("reel_providers");
       if (g) setGenres(new Set(JSON.parse(g) as Genre[]));
       if (s) setSpecial(new Set(JSON.parse(s) as Special[]));
+      if (p) setProviders(new Set(JSON.parse(p) as number[]));
     } catch { /* ignore */ }
     setFiltersReady(true);
   }, []);
@@ -48,8 +50,10 @@ export default function SwipePage() {
     const params = new URLSearchParams({ page: String(page) });
     const g = Array.from(genres);
     const s = Array.from(special);
-    if (g.length) params.set("genres",  g.join(","));
-    if (s.length) params.set("special", s.join(","));
+    const p = Array.from(providers);
+    if (g.length) params.set("genres",    g.join(","));
+    if (s.length) params.set("special",   s.join(","));
+    if (p.length) params.set("providers", p.join(","));
     // Send session-swiped IDs to server so it can exclude them immediately,
     // without waiting for DB commits
     if (swipedIds.current.size > 0) {
@@ -63,7 +67,7 @@ export default function SwipePage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [genres, special, filtersReady, page]);
+  }, [genres, special, providers, filtersReady, page]);
 
   const handleShortlist = useCallback(async (tmdbId: number, film: FilmData) => {
     await fetch("/api/shortlist", {
@@ -135,14 +139,25 @@ export default function SwipePage() {
     });
   }
 
-  function clearFilters() {
+  function toggleProvider(id: number) {
     setPage(1); setFilms([]); swipedIds.current.clear();
-    setGenres(new Set()); setSpecial(new Set());
-    sessionStorage.removeItem("reel_genres");
-    sessionStorage.removeItem("reel_special");
+    setProviders(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      sessionStorage.setItem("reel_providers", JSON.stringify(Array.from(next)));
+      return next;
+    });
   }
 
-  const totalFilters = genres.size + special.size;
+  function clearFilters() {
+    setPage(1); setFilms([]); swipedIds.current.clear();
+    setGenres(new Set()); setSpecial(new Set()); setProviders(new Set());
+    sessionStorage.removeItem("reel_genres");
+    sessionStorage.removeItem("reel_special");
+    sessionStorage.removeItem("reel_providers");
+  }
+
+  const totalFilters = genres.size + special.size + providers.size;
 
   return (
     <div style={{
@@ -281,8 +296,10 @@ export default function SwipePage() {
         open={filterOpen}
         genres={genres}
         special={special}
+        providers={providers}
         onToggleGenre={toggleGenre}
         onToggleSpecial={toggleSpecial}
+        onToggleProvider={toggleProvider}
         onClear={clearFilters}
         onClose={() => setFilterOpen(false)}
       />

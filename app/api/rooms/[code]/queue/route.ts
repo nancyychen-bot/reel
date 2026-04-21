@@ -5,7 +5,7 @@ import { type Genre, type Special } from "@/lib/filters";
 import { PRESTIGE_IDS } from "@/lib/prestige-ids";
 
 export async function GET(
-  _: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   const { code } = await params;
@@ -21,8 +21,10 @@ export async function GET(
 
   if (!room) return Response.json({ error: "Room not found" }, { status: 404 });
 
-  // Return cached queue if already generated
-  if (room.queue_imdb_ids?.length) {
+  const reset = request.nextUrl.searchParams.get("reset") === "1";
+
+  // Return cached queue if already generated (unless reset was requested)
+  if (!reset && room.queue_imdb_ids?.length) {
     const { data: films } = await supabase
       .from("movies")
       .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating")
@@ -37,13 +39,19 @@ export async function GET(
     return Response.json({ films: ordered.map(shapeFilm) });
   }
 
-  // Parse genres/special from mood_tags (stored as ["Drama","Thriller","Short"] etc.)
+  // Parse genres/special/providers from mood_tags
+  // Providers are stored as "provider:8", "provider:9" etc.
   const tags: string[] = room.mood_tags ?? [];
-  const SPECIAL_VALUES = ["Short", "Epic", "Classic", "Recent", "Art House"];
-  const genres         = tags.filter(t => !SPECIAL_VALUES.includes(t)) as Genre[];
-  const special        = tags.filter(t =>  SPECIAL_VALUES.includes(t)) as Special[];
+  const SPECIAL_VALUES = ["Short", "Epic", "Classic", "Recent", "Art House", "Popular"];
+  const providerTags   = tags.filter(t => t.startsWith("provider:"));
+  const nonProviderTags = tags.filter(t => !t.startsWith("provider:"));
+  const genres         = nonProviderTags.filter(t => !SPECIAL_VALUES.includes(t)) as Genre[];
+  const special        = nonProviderTags.filter(t =>  SPECIAL_VALUES.includes(t)) as Special[];
   const wantsArthouse  = special.includes("Art House");
   const filteredSpecial = special.filter(s => s !== "Art House") as Special[];
+  const roomProviderFilter = providerTags.length > 0
+    ? new Set(providerTags.map(t => parseInt(t.slice(9))))
+    : null;
 
   // Get participants and build prefs for both
   const { data: participants } = await supabase
@@ -123,28 +131,57 @@ export async function GET(
     };
   }
 
-  const [userAPrefs, userBPrefs] = await Promise.all(
-    participantIds.slice(0, 2).map(getPrefs)
-  );
+  const wantsRecent  = filteredSpecial.includes("Recent");
+  const currentYear  = new Date().getFullYear();
 
-  // Fetch arthouse IDs if Art House filter is active — prefer award winners
-  let arthouseIds: Set<number> | null = null;
-  if (wantsArthouse) {
-    const { data: af } = await supabase.from("arthouse_films").select("tmdb_id, award_winner");
-    const allAf   = af ?? [];
-    const awardIds = allAf.filter((r: any) => r.award_winner).map((r: any) => r.tmdb_id as number);
-    const allIds   = allAf.map((r: any) => r.tmdb_id as number);
-    arthouseIds = new Set(awardIds.length >= 30 ? awardIds : allIds);
-  }
-
-  // Quality pool: prestige films at 7.0+, general films at 7.8+ only.
-  // Live rooms should feel like a curated cinema programme.
-  const { data: pool } = await supabase
+  // Run prefs, pool, and optional arthouse/recent queries all in parallel
+  const poolQuery = supabase
     .from("movies")
     .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating, ebert_great_movie")
     .gte("tmdb_rating", 7.0)
     .order("tmdb_rating", { ascending: false })
     .limit(800);
+
+  const recentQuery = wantsRecent
+    ? supabase
+        .from("movies")
+        .select("tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating, ebert_great_movie")
+        .gte("year", currentYear - 3)
+        .gte("tmdb_rating", 6.5)
+        .order("tmdb_rating", { ascending: false })
+        .limit(400)
+    : Promise.resolve({ data: [] as any[] });
+
+  const arthouseQuery = wantsArthouse
+    ? supabase.from("arthouse_films").select("tmdb_id, award_winner")
+    : Promise.resolve({ data: [] as any[] });
+
+  const [allUserPrefs, poolResult, recentResult, arthouseResult] = await Promise.all([
+    Promise.all(participantIds.map(getPrefs)),
+    poolQuery,
+    recentQuery,
+    arthouseQuery,
+  ]);
+
+  // Fetch arthouse IDs if Art House filter is active — prefer award winners
+  let arthouseIds: Set<number> | null = null;
+  if (wantsArthouse) {
+    const allAf   = arthouseResult.data ?? [];
+    const awardIds = allAf.filter((r: any) => r.award_winner).map((r: any) => r.tmdb_id as number);
+    const allIds   = allAf.map((r: any) => r.tmdb_id as number);
+    arthouseIds = new Set(awardIds.length >= 30 ? awardIds : allIds);
+  }
+
+  // Merge base pool with recent films (deduplicated by tmdb_id)
+  const seenIds = new Set<number>();
+  const mergedPool: any[] = [];
+  for (const f of [...(poolResult.data ?? []), ...(recentResult.data ?? [])]) {
+    if (!seenIds.has(f.tmdb_id)) {
+      seenIds.add(f.tmdb_id);
+      mergedPool.push(f);
+    }
+  }
+  const pool = mergedPool;
 
   const toFilmRecord = (f: any): FilmRecord => ({
     tmdb_id:     f.tmdb_id,
@@ -160,22 +197,67 @@ export async function GET(
     list_count:  f.ebert_great_movie ? 4 : PRESTIGE_IDS.has(f.tmdb_id) ? 3 : 1,
   });
 
-  // Split: Ebert + prestige at any quality, general only if 7.8+; filter by arthouse if requested
-  const allFilms     = (pool ?? [])
-    .filter((f: any) => !arthouseIds || arthouseIds.has(f.tmdb_id))
-    .map(toFilmRecord);
+  // Build the film pool — if provider filter active, fetch from TMDB discover
+  // (same approach as the deck route) so we get the full catalog, not just the
+  // thin intersection of our prestige DB with the provider library.
+  let allFilms: FilmRecord[];
+
+  if (roomProviderFilter && roomProviderFilter.size > 0 && process.env.TMDB_API_KEY) {
+    const TMDB_KEY = process.env.TMDB_API_KEY;
+    const providerStr = Array.from(roomProviderFilter).join("|");
+    const providerPages = await Promise.all(
+      Array.from({ length: 15 }, (_, i) =>
+        fetch(
+          `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&with_watch_providers=${providerStr}&watch_region=US&sort_by=vote_average.desc&vote_count.gte=200&include_adult=false&page=${i + 1}`
+        ).then(r => r.json()).catch(() => ({ results: [] }))
+      )
+    );
+    const seen = new Set<number>();
+    const discoverFilms: FilmRecord[] = providerPages.flatMap((p: any) =>
+      (p.results ?? [])
+        .filter((f: any) => f.poster_path && f.title && !seen.has(f.id) && seen.add(f.id))
+        .map((f: any): FilmRecord => ({
+          tmdb_id:     f.id,
+          imdb_id:     String(f.id),
+          title:       f.title,
+          year:        parseInt(f.release_date?.slice(0, 4) ?? "0"),
+          runtime:     0,
+          genres:      (f.genre_ids ?? []).map((id: number) => {
+            const MAP: Record<number,string> = {28:"Action",12:"Adventure",16:"Animation",35:"Comedy",80:"Crime",99:"Documentary",18:"Drama",10751:"Family",14:"Fantasy",36:"History",27:"Horror",10402:"Music",9648:"Mystery",10749:"Romance",878:"Science Fiction",53:"Thriller",10752:"War",37:"Western"};
+            return MAP[id];
+          }).filter(Boolean),
+          director:    "",
+          plot:        f.overview ?? "",
+          poster_url:  f.poster_path ? `https://image.tmdb.org/t/p/w780${f.poster_path}` : "",
+          tmdb_rating: f.vote_average ?? 0,
+          list_count:  PRESTIGE_IDS.has(f.id) ? 3 : 1,
+        }))
+    );
+    // Enrich with DB prestige data for films we have on record
+    const dbByTmdbId = new Map((pool ?? []).map((f: any) => [f.tmdb_id, f]));
+    allFilms = discoverFilms.map(f => {
+      const db = dbByTmdbId.get(f.tmdb_id);
+      if (!db) return f;
+      return toFilmRecord(db); // use DB version — has full metadata + prestige score
+    });
+  } else {
+    allFilms = (pool ?? [])
+      .filter((f: any) => !arthouseIds || arthouseIds.has(f.tmdb_id))
+      .map(toFilmRecord);
+  }
+
   const ebertOrPrestige = (f: FilmRecord) => f.list_count >= 3;
   const prestigePool = allFilms.filter(ebertOrPrestige);
   const generalPool  = allFilms.filter(f => !ebertOrPrestige(f) && f.tmdb_rating >= 7.8);
 
+  const emptyPrefs = { favoriteGenres: [], seedGenres: [], seedDirectors: [], passedGenres: [], passedDirectors: [], eraCenter: 0 };
   const deckArgs = {
-    swipedIds:  new Set<number>(),
-    watchedIds: new Set<number>(),
-    userAPrefs: userAPrefs ?? { favoriteGenres: [], seedGenres: [], seedDirectors: [] },
-    userBPrefs: userBPrefs ?? { favoriteGenres: [], seedGenres: [], seedDirectors: [] },
-    moods:      [] as never[],
+    swipedIds:    new Set<number>(),
+    watchedIds:   new Set<number>(),
+    allUserPrefs: allUserPrefs.length > 0 ? allUserPrefs : [emptyPrefs],
+    moods:        [] as never[],
     genres,
-    special:    filteredSpecial,
+    special:      filteredSpecial,
   };
 
   // Target 80% prestige in the 60-film queue
@@ -184,16 +266,16 @@ export async function GET(
   const generalTarget   = TOTAL - prestigeTarget;   // 12
 
   const prestigeSlice = buildRoomDeck({ pool: prestigePool, ...deckArgs, count: prestigeTarget });
-  // If prestige pool was thin, fill extra slots from general
   const extraNeeded   = Math.max(0, prestigeTarget - prestigeSlice.length);
   const generalSlice  = buildRoomDeck({ pool: generalPool, ...deckArgs, count: generalTarget + extraNeeded });
 
   // Merge and shuffle
-  const merged = [...prestigeSlice, ...generalSlice];
+  let merged = [...prestigeSlice, ...generalSlice];
   for (let i = merged.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [merged[i], merged[j]] = [merged[j], merged[i]];
   }
+
   const deck = merged;
 
   // Cache on room row so both users get identical films

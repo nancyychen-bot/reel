@@ -40,13 +40,17 @@ export async function POST(request: NextRequest) {
     movie = { imdb_id: placeholderId, title: filmData.title, year: filmData.year, director: filmData.director, poster_url: filmData.posterUrl };
   }
 
-  // Upsert swipe (unique per user+film)
+  // Upsert swipe (unique per user+film).
+  // Room passes use ignoreDuplicates so they never overwrite an existing async
+  // like — otherwise a liked film that also gets passed in a room session would
+  // lose its like and re-appear in the regular deck.
+  const isRoomPass = source === "room" && direction === "pass";
   const { error: swipeErr } = await supabase.from("swipes").upsert({
     user_id:   user.id,
     imdb_id:   movie.imdb_id,
     direction,
     source:    source ?? "async",
-  }, { onConflict: "user_id,imdb_id" });
+  }, { onConflict: "user_id,imdb_id", ignoreDuplicates: isRoomPass });
   if (swipeErr) console.error("swipes upsert failed:", swipeErr.message);
 
   // Check for async match if liked

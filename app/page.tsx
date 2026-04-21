@@ -4,7 +4,7 @@ function TvIllustration() {
   return (
     <svg
       viewBox="0 0 390 520"
-      preserveAspectRatio="xMidYMid meet"
+      preserveAspectRatio="xMidYMid slice"
       style={{ width: "100%", height: "100%", display: "block" }}
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -132,24 +132,24 @@ export default function LandingPage() {
       flexDirection: "column",
       overflow: "hidden",
     }}>
-      {/* Illustration — top 60% */}
-      <div style={{ flex: "0 0 60%", position: "relative" }}>
+      {/* Illustration — fills whatever space remains above the text block */}
+      <div style={{ flex: "1 1 0", minHeight: 0, position: "relative", overflow: "hidden" }}>
         <TvIllustration />
       </div>
 
-      {/* Text + CTAs */}
+      {/* Text + CTAs — sizes to its own content, never clipped */}
       <div style={{
-        flex: 1,
+        flex: "0 0 auto",
         display: "flex",
         flexDirection: "column",
-        justifyContent: "flex-end",
-        padding: "0 28px calc(48px + env(safe-area-inset-bottom, 0px))",
+        padding: "0 28px",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)",
         background: "#05091F",
       }}>
         {/* Wordmark */}
         <div style={{
           fontFamily: "var(--font-display)",
-          fontSize: 88,
+          fontSize: "clamp(60px, 22vw, 88px)",
           color: "#F5F1EA",
           lineHeight: 0.88,
           letterSpacing: "-0.01em",
@@ -165,7 +165,7 @@ export default function LandingPage() {
           color: "rgba(245,241,234,0.45)",
           letterSpacing: "0.22em",
           textTransform: "uppercase",
-          marginBottom: 18,
+          marginBottom: 14,
         }}>
           A Film Club With Friends
         </div>
@@ -176,7 +176,7 @@ export default function LandingPage() {
           fontWeight: 400,
           lineHeight: 1.65,
           color: "rgba(245,241,234,0.65)",
-          marginBottom: 32,
+          marginBottom: 28,
           maxWidth: 300,
         }}>
           Stop spending hours finding something to watch. Pick vibes, swipe curated options and match on films you all like. Tonight is sorted.
@@ -196,7 +196,7 @@ export default function LandingPage() {
           fontWeight: 600,
           letterSpacing: "0.04em",
           textDecoration: "none",
-          marginBottom: 14,
+          marginBottom: 12,
         }}>
           Log in
         </Link>

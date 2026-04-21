@@ -213,14 +213,58 @@ async function fetchBroadDiscover(pages = 15, pageOffset = 0): Promise<FilmRecor
   );
 }
 
+// Provider-filtered discover: films available on specific streaming services.
+// Uses TMDB's with_watch_providers (pipe = OR) so Netflix|Prime returns films on either.
+async function fetchProviderDiscover(
+  providerIds: Set<number>,
+  genres: Genre[],
+  special: Special[],
+  pages = 15,
+): Promise<FilmRecord[]> {
+  if (!TMDB_KEY) return [];
+  const providerStr = Array.from(providerIds).join("|");
+  const genrePart   = genres.length > 0
+    ? `&with_genres=${genres.map(g => GENRE_TO_TMDB[g]).filter(Boolean).join("|")}`
+    : "";
+
+  const dateParts: string[] = [];
+  if (special.includes("Classic")) dateParts.push("primary_release_date.lte=1979-12-31");
+  if (special.includes("Recent"))  dateParts.push(`primary_release_date.gte=${CURRENT_YEAR - 3}-01-01`);
+  const datePart = dateParts.length > 0 ? `&${dateParts.map(d => d).join("&")}` : "";
+
+  const runtimePart = special.includes("Short") ? "&with_runtime.lte=99&with_runtime.gte=20"
+                    : special.includes("Epic")   ? "&with_runtime.gte=150"
+                    : "";
+
+  const synRuntime = syntheticRuntimeFor(special);
+  const base = `with_watch_providers=${providerStr}&watch_region=US&sort_by=vote_average.desc&vote_count.gte=200&include_adult=false${genrePart}${datePart}${runtimePart}`;
+
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_KEY}&${base}&page=${i + 1}`
+      ).then(r => r.json()).catch(() => ({ results: [] }))
+    )
+  );
+
+  const seen = new Set<number>();
+  return results.flatMap((p: any) =>
+    (p.results ?? [])
+      .filter((f: any) => f.poster_path && f.title && !seen.has(f.id) && seen.add(f.id))
+      .map((f: any) => tmdbResultToFilm(f, 0, synRuntime))
+  );
+}
+
 // ── route ─────────────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const genresParam  = request.nextUrl.searchParams.get("genres")  ?? "";
-  const specialParam = request.nextUrl.searchParams.get("special") ?? "";
-  const excludeParam = request.nextUrl.searchParams.get("exclude") ?? "";
-  const genres  = genresParam  ? (genresParam.split(",")  as Genre[])   : [];
-  const special = specialParam ? (specialParam.split(",") as Special[]) : [];
+  const genresParam    = request.nextUrl.searchParams.get("genres")    ?? "";
+  const specialParam   = request.nextUrl.searchParams.get("special")   ?? "";
+  const excludeParam   = request.nextUrl.searchParams.get("exclude")   ?? "";
+  const providersParam = request.nextUrl.searchParams.get("providers") ?? "";
+  const genres    = genresParam    ? (genresParam.split(",")  as Genre[])   : [];
+  const special   = specialParam   ? (specialParam.split(",") as Special[]) : [];
+  const providerFilter = providersParam ? new Set(providersParam.split(",").map(Number)) : null;
   const page    = parseInt(request.nextUrl.searchParams.get("page") ?? "1");
   // Session-swiped IDs sent by the client — exclude immediately without waiting for DB commits
   const sessionExcludeIds = new Set<number>(
@@ -237,8 +281,8 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Swipe history + prefs — order swipes newest-first so recent likes weight more
-  const [{ data: prefs }, { data: swipes }] = await Promise.all([
+  // Swipe history + prefs + watched — order swipes newest-first so recent likes weight more
+  const [{ data: prefs }, { data: swipes }, { data: watchedRows }] = await Promise.all([
     supabase.from("user_preferences")
       .select("preferred_genres, favorite_film_tmdb_ids")
       .eq("user_id", user.id)
@@ -246,7 +290,11 @@ export async function GET(request: NextRequest) {
     supabase.from("swipes")
       .select("imdb_id, direction, source")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .limit(5000),
+    supabase.from("watched")
+      .select("imdb_id")
+      .eq("user_id", user.id),
   ]);
 
   // Room passes are temporary — don't permanently exclude them from the regular deck.
@@ -331,7 +379,11 @@ export async function GET(request: NextRequest) {
   // Numeric placeholder imdb_ids (e.g. "12345") ARE the tmdb_id — add them directly.
   // This covers discover films whose movies upsert may have failed.
   const directTmdbIds = new Set<number>();
-  for (const id of allSwipedImdbIds) {
+  const allExcludedImdbIds = [
+    ...allSwipedImdbIds,
+    ...(watchedRows ?? []).map((w: any) => w.imdb_id).filter(Boolean),
+  ];
+  for (const id of allExcludedImdbIds) {
     const n = parseInt(id);
     if (!isNaN(n)) directTmdbIds.add(n);
   }
@@ -339,15 +391,13 @@ export async function GET(request: NextRequest) {
   // ── Build filter-aware DB query ──────────────────────────────────────────
   const MOVIE_SELECT = "tmdb_id, imdb_id, title, year, runtime_minutes, genres, director, plot, poster_url, tmdb_rating, ebert_great_movie";
 
-  // Swipe lookup: resolve real imdb_ids (tt...) → tmdb_id via movies table.
-  // No slice limit — a user can have thousands of swipes.
-  const realImdbIds = allSwipedImdbIds.filter(id => isNaN(parseInt(id)));
+  // Resolve real imdb_ids (tt...) → tmdb_id via movies table (swipes + watched).
+  const realImdbIds = allExcludedImdbIds.filter(id => isNaN(parseInt(id)));
   const swipedMoviesPromise = realImdbIds.length > 0
-    ? supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", realImdbIds)
+    ? supabase.from("movies").select("tmdb_id, imdb_id").in("imdb_id", realImdbIds).limit(5000)
     : Promise.resolve({ data: [] as any[] });
 
   let dbPool: any[] = [];
-  let arthouseIds: Set<number> | null = null;
 
   if (wantsArthouse) {
     // For Art House: fetch arthouse records with award_winner flag.
@@ -359,7 +409,6 @@ export async function GET(request: NextRequest) {
     const allAfIds = allAf.map((r: any) => r.tmdb_id as number);
     // Use award winners if there are enough; otherwise fall back to all arthouse
     const afIds = awardIds.length >= 30 ? awardIds : allAfIds;
-    arthouseIds = new Set(afIds);
 
     if (afIds.length > 0) {
       const { data } = await supabase
@@ -401,7 +450,11 @@ export async function GET(request: NextRequest) {
 
   // DB films — Ebert Great Movies get the highest boost (list_count 4),
   // other prestige films get 3, rest get 0.
+  // Filter by both imdb_id and tmdb_id so swiped films are excluded even when
+  // the imdb_id → tmdb_id lookup (swipedMoviesPromise) is incomplete.
+  const excludedImdbSet = new Set(allExcludedImdbIds);
   const dbFilms: FilmRecord[] = dbPool
+    .filter((f: any) => !excludedImdbSet.has(f.imdb_id) && !swipedIds.has(f.tmdb_id))
     .map((f: any) => tmdbResultToFilm(
       f,
       f.ebert_great_movie  ? 4 :
@@ -414,12 +467,13 @@ export async function GET(request: NextRequest) {
   // For Art House we rely entirely on the DB (arthouse_films).
   // For broad unfiltered browsing, only run discover when DB is thin or on later pages.
   const [recFilms, discoverFilms] = await Promise.all([
-    // Skip recommendations for Popular — they're not vote-count filtered
-    wantsPopular ? Promise.resolve([] as FilmRecord[]) : fetchRecommendations(likedTmdbIds, new Set([...swipedIds, ...dbIds])),
+    // Skip recommendations for Popular/provider filters — they're not vote-count filtered
+    (wantsPopular || providerFilter) ? Promise.resolve([] as FilmRecord[]) : fetchRecommendations(likedTmdbIds, new Set([...swipedIds, ...dbIds])),
     (() => {
-      if (wantsArthouse) return Promise.resolve([] as FilmRecord[]);
-      if (wantsPopular)  return fetchPopularDiscover(genres, filteredSpecial, 12);
-      if (hasFilters)    return fetchFilteredDiscover(genres, filteredSpecial, 20);
+      if (wantsArthouse)  return Promise.resolve([] as FilmRecord[]);
+      if (providerFilter) return fetchProviderDiscover(providerFilter, genres, filteredSpecial, 15);
+      if (wantsPopular)   return fetchPopularDiscover(genres, filteredSpecial, 12);
+      if (hasFilters)     return fetchFilteredDiscover(genres, filteredSpecial, 20);
       if (dbFilms.length < 100 || page > 3)
         return fetchBroadDiscover(15, (page - 1) * 60);
       return Promise.resolve([] as FilmRecord[]);
@@ -430,16 +484,29 @@ export async function GET(request: NextRequest) {
   // Popular: use only discover (DB has no vote_count filter).
   // Art House: recs/discover are empty; DB was fetched from arthouse_films IDs directly.
   const seen = new Set<number>(swipedIds);
-  const filmPool: FilmRecord[] = [];
-  const mergeSource = wantsPopular
-    ? discoverFilms
-    : [...recFilms, ...dbFilms, ...discoverFilms];
+  let filmPool: FilmRecord[] = [];
+  // For provider filter: enrich discover results with DB prestige data.
+  // DB films that are also in the provider pool carry their list_count/ebert boost.
+  // For Popular: discover only (no prestige bias intended).
+  let mergeSource: FilmRecord[];
+  if (providerFilter) {
+    const providerTmdbIds = new Set(discoverFilms.map(f => f.tmdb_id));
+    const enrichedDb = dbFilms.filter(f => providerTmdbIds.has(f.tmdb_id));
+    mergeSource = [...enrichedDb, ...discoverFilms];
+  } else if (wantsPopular) {
+    mergeSource = discoverFilms;
+  } else {
+    mergeSource = [...recFilms, ...dbFilms, ...discoverFilms];
+  }
   for (const f of mergeSource) {
     if (!seen.has(f.tmdb_id)) {
       seen.add(f.tmdb_id);
       filmPool.push(f);
     }
   }
+
+  // Provider filter is handled via fetchProviderDiscover (see below) —
+  // no post-hoc per-film lookup needed here.
 
   const userPrefs: UserPrefs = {
     favoriteGenres:  prefs?.preferred_genres ?? [],

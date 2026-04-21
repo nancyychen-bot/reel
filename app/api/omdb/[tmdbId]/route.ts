@@ -1,7 +1,31 @@
 import { NextRequest } from "next/server";
+import { PROVIDER_IDS } from "@/lib/providers";
 
 const OMDB_KEY = process.env.OMDB_API_KEY;
 const TMDB_KEY = process.env.TMDB_API_KEY;
+
+async function fetchTrailerKey(tmdbId: string): Promise<string | undefined> {
+  if (!TMDB_KEY) return undefined;
+  const data = await fetch(
+    `https://api.themoviedb.org/3/movie/${tmdbId}/videos?api_key=${TMDB_KEY}`,
+    { next: { revalidate: 86400 } }
+  ).then(r => r.json()).catch(() => null);
+  const videos: Array<{ site: string; type: string; key: string; official: boolean }> = data?.results ?? [];
+  const trailers = videos.filter(v => v.site === "YouTube" && v.type === "Trailer");
+  const pick = trailers.find(v => v.official) ?? trailers[0];
+  return pick?.key;
+}
+
+async function fetchStreamingProviders(tmdbId: string): Promise<Array<{ id: number; name: string }>> {
+  if (!TMDB_KEY) return [];
+  const data = await fetch(
+    `https://api.themoviedb.org/3/movie/${tmdbId}/watch/providers?api_key=${TMDB_KEY}`,
+    { next: { revalidate: 86400 } }
+  ).then(r => r.json()).catch(() => null);
+  return ((data?.results?.US?.flatrate ?? []) as Array<{ provider_id: number; provider_name: string }>)
+    .filter(p => PROVIDER_IDS.has(p.provider_id as any))
+    .map(p => ({ id: p.provider_id, name: p.provider_name }));
+}
 
 // Parse specific festival wins and nominations from OMDB awards text.
 // OMDB format: "Won 1 Palme d'Or. Nominated for 2 Oscars. 22 wins & 37 nominations."
@@ -83,14 +107,18 @@ export async function GET(
   const knownImdbId = imdbIdParam?.startsWith("tt") ? imdbIdParam : null;
 
   if (knownImdbId) {
-    // Fast path: go straight to OMDB
-    const omdb = await fetch(
-      `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${knownImdbId}`,
-      { next: { revalidate: 86400 } }
-    ).then(r => r.json()).catch(() => null);
+    // Fast path: go straight to OMDB, fetch providers + trailer in parallel
+    const [omdb, streamingProviders, trailerKey] = await Promise.all([
+      fetch(
+        `https://www.omdbapi.com/?apikey=${OMDB_KEY}&i=${knownImdbId}`,
+        { next: { revalidate: 86400 } }
+      ).then(r => r.json()).catch(() => null),
+      fetchStreamingProviders(tmdbId),
+      fetchTrailerKey(tmdbId),
+    ]);
 
     if (!omdb || omdb.Response === "False") {
-      return Response.json({ imdbId: knownImdbId });
+      return Response.json({ imdbId: knownImdbId, trailerKey, streamingProviders: streamingProviders.length ? streamingProviders : undefined });
     }
 
     const rtRating = (omdb.Ratings as Array<{ Source: string; Value: string }> | undefined)
@@ -112,16 +140,22 @@ export async function GET(
       runtime:   omdb.Runtime  !== "N/A" ? parseInt(omdb.Runtime) : undefined,
       language:  omdb.Language !== "N/A" ? omdb.Language : undefined,
       country:   omdb.Country  !== "N/A" ? omdb.Country  : undefined,
+      trailerKey,
+      streamingProviders: streamingProviders.length ? streamingProviders : undefined,
     });
   }
 
   // Slow path: look up IMDb ID via TMDB first (fallback for cards without imdbId)
   if (!TMDB_KEY) return Response.json({});
 
-  const tmdbRes = await fetch(
-    `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_KEY}&append_to_response=external_ids,credits`,
-    { next: { revalidate: 86400 } }
-  ).then(r => r.json()).catch(() => null);
+  const [tmdbRes, streamingProviders, trailerKey] = await Promise.all([
+    fetch(
+      `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_KEY}&append_to_response=external_ids,credits`,
+      { next: { revalidate: 86400 } }
+    ).then(r => r.json()).catch(() => null),
+    fetchStreamingProviders(tmdbId),
+    fetchTrailerKey(tmdbId),
+  ]);
 
   const imdbId = tmdbRes?.external_ids?.imdb_id;
   const director = (tmdbRes?.credits?.crew as Array<{ job: string; name: string }> | undefined)
@@ -133,7 +167,7 @@ export async function GET(
   const country = (tmdbRes?.production_countries as Array<{ name: string }> | undefined)?.[0]?.name;
 
   if (!imdbId) {
-    return Response.json({ director, runtime, language, country });
+    return Response.json({ director, runtime, language, country, trailerKey, streamingProviders: streamingProviders.length ? streamingProviders : undefined });
   }
 
   const omdb = await fetch(
@@ -142,7 +176,7 @@ export async function GET(
   ).then(r => r.json()).catch(() => null);
 
   if (!omdb || omdb.Response === "False") {
-    return Response.json({ imdbId, director, runtime, language, country });
+    return Response.json({ imdbId, director, runtime, language, country, trailerKey });
   }
 
   const rtRating = (omdb.Ratings as Array<{ Source: string; Value: string }> | undefined)
@@ -164,5 +198,7 @@ export async function GET(
     runtime:   runtime  ?? (omdb.Runtime  !== "N/A" ? parseInt(omdb.Runtime) : undefined),
     language:  language ?? (omdb.Language !== "N/A" ? omdb.Language : undefined),
     country:   country  ?? (omdb.Country  !== "N/A" ? omdb.Country  : undefined),
+    trailerKey,
+    streamingProviders: streamingProviders.length ? streamingProviders : undefined,
   });
 }

@@ -1,15 +1,18 @@
 "use client";
 
 import { GENRES, SPECIAL, type Genre, type Special } from "@/lib/filters";
+import { STREAMING_PROVIDERS } from "@/lib/providers";
 
 interface FilterPanelProps {
-  open:            boolean;
-  genres:          Set<Genre>;
-  special:         Set<Special>;
-  onToggleGenre:   (g: Genre) => void;
-  onToggleSpecial: (s: Special) => void;
-  onClear:         () => void;
-  onClose:         () => void;
+  open:             boolean;
+  genres:           Set<Genre>;
+  special:          Set<Special>;
+  providers:        Set<number>;
+  onToggleGenre:    (g: Genre) => void;
+  onToggleSpecial:  (s: Special) => void;
+  onToggleProvider: (id: number) => void;
+  onClear:          () => void;
+  onClose:          () => void;
 }
 
 const SPECIAL_LABELS: Record<Special, string> = {
@@ -22,9 +25,9 @@ const SPECIAL_LABELS: Record<Special, string> = {
 };
 
 export default function FilterPanel({
-  open, genres, special, onToggleGenre, onToggleSpecial, onClear, onClose,
+  open, genres, special, providers, onToggleGenre, onToggleSpecial, onToggleProvider, onClear, onClose,
 }: FilterPanelProps) {
-  const totalActive = genres.size + special.size;
+  const totalActive = genres.size + special.size + providers.size;
 
   return (
     <>
@@ -54,6 +57,8 @@ export default function FilterPanel({
           borderTop: "1px solid #1e1e1e",
           borderRadius: "10px 10px 0 0",
           padding: "16px 20px 32px",
+          maxHeight: "70vh",
+          overflowY: "auto",
           transform: open ? "translateY(0)" : "translateY(200%)",
           transition: "transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94)",
         }}
@@ -129,7 +134,7 @@ export default function FilterPanel({
         </div>
 
         {/* Genre filters */}
-        <div>
+        <div style={{ marginBottom: 20 }}>
           <div style={{
             fontFamily: "var(--font-mono)", fontSize: 9,
             color: "#2e2e2e", letterSpacing: "0.14em",
@@ -159,6 +164,43 @@ export default function FilterPanel({
                   }}
                 >
                   {g}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Streaming filters */}
+        <div>
+          <div style={{
+            fontFamily: "var(--font-mono)", fontSize: 9,
+            color: "#2e2e2e", letterSpacing: "0.14em",
+            textTransform: "uppercase", marginBottom: 10,
+          }}>
+            Streaming
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {STREAMING_PROVIDERS.map(p => {
+              const on = providers.has(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onToggleProvider(p.id)}
+                  style={{
+                    background: on ? `${p.color}22` : "transparent",
+                    border: `1px solid ${on ? `${p.color}88` : "#252525"}`,
+                    borderRadius: 2,
+                    padding: "6px 13px",
+                    color: on ? p.color : "#3a3a3a",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 11,
+                    cursor: "pointer",
+                    letterSpacing: "0.03em",
+                    whiteSpace: "nowrap",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {p.name}
                 </button>
               );
             })}

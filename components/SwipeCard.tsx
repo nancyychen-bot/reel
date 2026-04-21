@@ -468,75 +468,73 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
 
           <p style={{
             fontFamily: "var(--font-sans)", fontSize: 15,
-            color: "#9A9590", lineHeight: 1.7, marginBottom: 20,
+            color: "#9A9590", lineHeight: 1.7, marginBottom: 16,
           }}>
             {film.plot}
           </p>
 
-          {/* Ratings + Letterboxd + Trailer */}
+          {/* Action buttons — Trailer + Letterboxd */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {enriched?.trailerKey && (
+              <button
+                onMouseDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
+                onClick={() => setTrailerOpen(true)}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "#C9A961",
+                  background: "rgba(201,169,97,0.08)",
+                  border: "1px solid rgba(201,169,97,0.25)",
+                  borderRadius: 2,
+                  padding: "7px 14px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ▶ Trailer
+              </button>
+            )}
+            <a
+              href={`https://letterboxd.com/tmdb/${film.tmdbId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onMouseDown={e => e.stopPropagation()}
+              onTouchStart={e => e.stopPropagation()}
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "#5A5550",
+                border: "1px solid #222",
+                borderRadius: 2,
+                padding: "7px 14px",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Letterboxd ↗
+            </a>
+          </div>
+
+          {/* Ratings */}
           <div style={{ marginBottom: 18 }}>
-            {/* Labels row — IMDb · RT · action buttons all on the same baseline */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <div style={{ display: "flex", gap: 24 }}>
-                {enriched?.imdbRating != null && (
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em" }}>IMDb</div>
-                )}
-                {enriched?.rtScore != null && (
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em" }}>Rotten Tomatoes</div>
-                )}
-                {enriched === null && isTop && (
-                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#2a2a2a", letterSpacing: "0.12em" }}>
-                    Loading ratings…
-                  </div>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                {enriched?.trailerKey && (
-                  <button
-                    onMouseDown={e => e.stopPropagation()}
-                    onTouchStart={e => e.stopPropagation()}
-                    onClick={() => setTrailerOpen(true)}
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 10,
-                      letterSpacing: "0.14em",
-                      textTransform: "uppercase",
-                      color: "#C9A961",
-                      background: "rgba(201,169,97,0.08)",
-                      border: "1px solid rgba(201,169,97,0.25)",
-                      borderRadius: 2,
-                      padding: "4px 10px",
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    ▶ Trailer
-                  </button>
-                )}
-                <a
-                  href={`https://letterboxd.com/tmdb/${film.tmdbId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onMouseDown={e => e.stopPropagation()}
-                  onTouchStart={e => e.stopPropagation()}
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10,
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: "#5A5550",
-                    border: "1px solid #222",
-                    borderRadius: 2,
-                    padding: "4px 10px",
-                    textDecoration: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Letterboxd ↗
-                </a>
-              </div>
+            <div style={{ display: "flex", gap: 24, marginBottom: 4 }}>
+              {enriched?.imdbRating != null && (
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em" }}>IMDb</div>
+              )}
+              {enriched?.rtScore != null && (
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#3a3a3a", letterSpacing: "0.12em" }}>Rotten Tomatoes</div>
+              )}
+              {enriched === null && isTop && (
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "#2a2a2a", letterSpacing: "0.12em" }}>
+                  Loading ratings…
+                </div>
+              )}
             </div>
-            {/* Numbers row */}
             <div style={{ display: "flex", gap: 24 }}>
               {enriched?.imdbRating != null && (
                 <div style={{ fontFamily: "var(--font-mono)", fontSize: 26, color: visual.accent }}>{enriched.imdbRating.toFixed(1)}</div>

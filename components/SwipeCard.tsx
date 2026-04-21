@@ -667,7 +667,7 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
                 style={{ width: "100%", height: "100%", border: "none" }}
               />
             </div>
-            {/* Close button — bottom-right in portrait = top-right in landscape */}
+            {/* Close button — bottom-right in portrait = top-right in landscape, rotated to match */}
             <button
               onClick={() => setTrailerOpen(false)}
               style={{
@@ -685,6 +685,8 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
                 textTransform: "uppercase",
                 padding: "6px 14px",
                 cursor: "pointer",
+                transform: "rotate(90deg)",
+                transformOrigin: "center center",
               }}
             >
               ✕ Close

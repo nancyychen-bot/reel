@@ -25,16 +25,19 @@ interface Enriched {
   runtime?:      number;
   language?:     string;
   country?:      string;
+  trailerKey?:   string;
 }
 
 const ACCENT = "#C9A961";
 
 export default function FilmModal({ film, onClose }: { film: ModalFilm | null; onClose: () => void }) {
   const [enriched, setEnriched] = useState<Enriched | null>(null);
+  const [trailerOpen, setTrailerOpen] = useState(false);
 
   useEffect(() => {
-    if (!film) { setEnriched(null); return; }
+    if (!film) { setEnriched(null); setTrailerOpen(false); return; }
     setEnriched(null);
+    setTrailerOpen(false);
     if (!film.tmdbId) return;
     const url = film.imdbId?.startsWith("tt")
       ? `/api/omdb/${film.tmdbId}?imdbId=${film.imdbId}`
@@ -228,28 +231,99 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
             </div>
           )}
 
-          {/* Learn More */}
-          <a
-            href={`https://www.rottentomatoes.com/search?search=${encodeURIComponent(film.title)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-block",
-              fontFamily: "var(--font-mono)",
-              fontSize: 9,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "#5A5550",
-              border: "1px solid #222",
-              borderRadius: 2,
-              padding: "7px 14px",
-              textDecoration: "none",
-            }}
-          >
-            Learn More ↗
-          </a>
+          {/* Trailer + Letterboxd */}
+          <div style={{ display: "flex", gap: 8 }}>
+            {enriched?.trailerKey && (
+              <button
+                onClick={() => setTrailerOpen(true)}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 9,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "#C9A961",
+                  background: "rgba(201,169,97,0.08)",
+                  border: "1px solid rgba(201,169,97,0.25)",
+                  borderRadius: 2,
+                  padding: "7px 14px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ▶ Trailer
+              </button>
+            )}
+            {film.tmdbId && (
+              <a
+                href={`https://letterboxd.com/tmdb/${film.tmdbId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-block",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 9,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "#5A5550",
+                  border: "1px solid #222",
+                  borderRadius: 2,
+                  padding: "7px 14px",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Letterboxd ↗
+              </a>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Trailer modal */}
+      {trailerOpen && enriched?.trailerKey && (
+        <div
+          onClick={() => setTrailerOpen(false)}
+          style={{
+            position: "fixed", inset: 0,
+            zIndex: 300,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: "100%", aspectRatio: "16/9" }}
+          >
+            <iframe
+              src={`https://www.youtube.com/embed/${enriched.trailerKey}?autoplay=1&rel=0&modestbranding=1`}
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+              style={{ width: "100%", height: "100%", border: "none" }}
+            />
+          </div>
+          <button
+            onClick={() => setTrailerOpen(false)}
+            style={{
+              background: "none",
+              border: "1px solid #333",
+              borderRadius: 2,
+              color: "#5A5550",
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              padding: "6px 18px",
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+      )}
     </>
   );
 }

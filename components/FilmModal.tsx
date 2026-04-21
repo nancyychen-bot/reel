@@ -59,7 +59,6 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
     <>
       {/* Backdrop */}
       <div
-        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         style={{
           position: "fixed", inset: 0,
           background: "rgba(0,0,0,0.72)",

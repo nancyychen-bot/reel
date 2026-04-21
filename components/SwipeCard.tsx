@@ -59,7 +59,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
   const [dragging, setDragging] = useState(false);
   const [exiting,  setExiting]  = useState<"left" | "right" | null>(null);
   const [details,  setDetails]  = useState(false);
-  const panelTouchStartY = useRef(0);
   const [posterUrl, setPosterUrl]  = useState<string | null>(film.posterUrl || null);
   const [posterLoaded, setPosterLoaded] = useState(false);
   const [enriched, setEnriched] = useState<{
@@ -429,16 +428,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             overflow: "hidden",
           }}
           onMouseDown={e => e.stopPropagation()}
-          onTouchStart={e => {
-            // Capture start Y AND stop card drag handler from firing
-            panelTouchStartY.current = e.touches[0].clientY;
-            e.stopPropagation();
-          }}
-          onTouchEnd={e => {
-            const dy = e.changedTouches[0].clientY - panelTouchStartY.current;
-            const el = e.currentTarget.querySelector("[data-scroll]") as HTMLDivElement | null;
-            if (dy > 60 && (el?.scrollTop ?? 0) <= 2) setDetails(false);
-          }}
         >
           {/* Header: drag handle + LESS button */}
           <div style={{

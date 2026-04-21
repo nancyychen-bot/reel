@@ -68,7 +68,7 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
       />
 
       {/* Sheet */}
-      <div style={{
+      <div onClick={e => e.stopPropagation()} style={{
         position: "fixed",
         left: 0, right: 0,
         bottom: "calc(70px + env(safe-area-inset-bottom, 0px))" as string,

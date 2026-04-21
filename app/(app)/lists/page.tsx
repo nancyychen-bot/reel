@@ -186,7 +186,7 @@ function GridCard({
             onClick={() => !isWatched && onWatch(item)}
             title={isWatched ? "Watched" : "Mark as Watched"}
             style={{
-              width: 28,
+              flex: 1,
               background: isWatched ? "#0e1a0e" : "transparent",
               border: `1px solid ${isWatched ? "#4a7c4a40" : "rgba(245,241,234,0.06)"}`,
               color: isWatched ? "#6aaa6a" : "#3a3a3a",
@@ -204,8 +204,7 @@ function GridCard({
             onClick={() => onRemove(item)}
             title="Remove"
             style={{
-              flex: canShortlist ? undefined : 1,
-              width: canShortlist ? 28 : undefined,
+              flex: 1,
               background: "transparent",
               border: "1px solid rgba(245,241,234,0.06)",
               color: "#3a3a3a",

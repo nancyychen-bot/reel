@@ -418,14 +418,15 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
         <div
           style={{
             position: "absolute", left: 0, right: 0,
-            bottom: details ? 0 : -500,
-            height: 500,
+            bottom: details ? 0 : -9999,
+            height: "calc(100% - 0px)",
             backdropFilter: "blur(24px) brightness(0.7)",
             backgroundColor: "rgba(8,8,8,0.94)",
             transition: "bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)",
             padding: "0 22px 24px",
             zIndex: 10,
             overflowY: "auto",
+            touchAction: "pan-y",
           }}
           onMouseDown={e => e.stopPropagation()}
           onTouchStart={e => {

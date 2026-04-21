@@ -59,7 +59,7 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
     <>
       {/* Backdrop */}
       <div
-        onClick={onClose}
+        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
         style={{
           position: "fixed", inset: 0,
           background: "rgba(0,0,0,0.72)",
@@ -235,7 +235,7 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
           <div style={{ display: "flex", gap: 8 }}>
             {enriched?.trailerKey && (
               <button
-                onClick={() => setTrailerOpen(true)}
+                onClick={e => { e.stopPropagation(); setTrailerOpen(true); }}
                 style={{
                   fontFamily: "var(--font-mono)",
                   fontSize: 9,
@@ -258,6 +258,7 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
                 href={`https://letterboxd.com/tmdb/${film.tmdbId}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
                 style={{
                   display: "inline-block",
                   fontFamily: "var(--font-mono)",

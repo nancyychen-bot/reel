@@ -666,13 +666,13 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
                 style={{ width: "100%", height: "100%", border: "none" }}
               />
             </div>
-            {/* Close button — top-left corner (appears top-right in landscape) */}
+            {/* Close button — bottom-right in portrait = top-right in landscape */}
             <button
               onClick={() => setTrailerOpen(false)}
               style={{
                 position: "absolute",
-                top: 16,
-                left: 16,
+                bottom: 16,
+                right: 16,
                 zIndex: 10000,
                 background: "rgba(0,0,0,0.6)",
                 border: "1px solid #444",

@@ -418,33 +418,52 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
         <div
           style={{
             position: "absolute", left: 0, right: 0,
-            bottom: details ? 0 : -9999,
-            height: "calc(100% - 0px)",
+            top: details ? 0 : "100%",
+            bottom: 0,
             backdropFilter: "blur(24px) brightness(0.7)",
             backgroundColor: "rgba(8,8,8,0.94)",
-            transition: "bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)",
-            padding: "0 22px 24px",
+            transition: "top 0.38s cubic-bezier(0.25,0.46,0.45,0.94)",
             zIndex: 10,
-            overflowY: "auto",
-            touchAction: "pan-y",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
           }}
           onMouseDown={e => e.stopPropagation()}
           onTouchStart={e => {
+            // Capture start Y AND stop card drag handler from firing
             panelTouchStartY.current = e.touches[0].clientY;
+            e.stopPropagation();
           }}
           onTouchEnd={e => {
             const dy = e.changedTouches[0].clientY - panelTouchStartY.current;
-            const el = e.currentTarget as HTMLDivElement;
-            // Swipe down from top of panel → close
-            if (dy > 50 && el.scrollTop <= 2) setDetails(false);
+            const el = e.currentTarget.querySelector("[data-scroll]") as HTMLDivElement | null;
+            if (dy > 60 && (el?.scrollTop ?? 0) <= 2) setDetails(false);
           }}
         >
-          {/* Drag handle */}
+          {/* Header: drag handle + LESS button */}
           <div style={{
-            width: 36, height: 4, borderRadius: 2,
-            background: "#2a2a2a",
-            margin: "12px auto 16px",
-          }} />
+            flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            position: "relative",
+            padding: "12px 22px 4px",
+          }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: "#2a2a2a" }} />
+            <button
+              onClick={() => setDetails(false)}
+              onMouseDown={e => e.stopPropagation()}
+              style={{
+                position: "absolute", right: 16,
+                background: "transparent", border: "none",
+                color: visual.accent, cursor: "pointer",
+                fontFamily: "var(--font-mono)", fontSize: 10,
+                letterSpacing: "0.18em", padding: "10px",
+                opacity: 0.8,
+              }}
+            >▲ LESS</button>
+          </div>
+
+          {/* Scrollable content */}
+          <div data-scroll style={{ flex: 1, overflowY: "auto", padding: "8px 22px 32px", touchAction: "pan-y" }}>
 
           {/* Film header — title, year, director */}
           <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: "1px solid #1a1a1a" }}>
@@ -479,7 +498,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             {enriched?.trailerKey && (
               <button
                 onMouseDown={e => e.stopPropagation()}
-                onTouchStart={e => e.stopPropagation()}
                 onClick={() => setTrailerOpen(true)}
                 style={{
                   fontFamily: "var(--font-mono)",
@@ -503,7 +521,6 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
               target="_blank"
               rel="noopener noreferrer"
               onMouseDown={e => e.stopPropagation()}
-              onTouchStart={e => e.stopPropagation()}
               style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: 10,
@@ -606,29 +623,29 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             </div>
           )}
 
-        </div>
+          </div>{/* end scrollable content */}
+        </div>{/* end detail panel */}
 
-        {/* Detail toggle */}
-        {isTop && (
+        {/* MORE button — only visible when panel is closed */}
+        {isTop && !details && (
           <button
-            onClick={() => setDetails(d => !d)}
+            onClick={() => setDetails(true)}
             onMouseDown={e => e.stopPropagation()}
             onTouchStart={e => e.stopPropagation()}
             style={{
               position: "absolute",
-              bottom: details ? 510 : 120,
+              bottom: 120,
               left: "50%", transform: "translateX(-50%)",
               background: "transparent", border: "none",
               color: visual.accent,
               cursor: "pointer",
               fontFamily: "var(--font-mono)", fontSize: 10,
               letterSpacing: "0.18em", padding: "10px 20px",
-              transition: "bottom 0.38s cubic-bezier(0.25,0.46,0.45,0.94)",
               zIndex: 15,
               opacity: 0.8,
             }}
           >
-            {details ? "▲  LESS" : "▼  MORE"}
+            ▼  MORE
           </button>
         )}
 

@@ -55,6 +55,7 @@ function deriveAccent(title: string) {
 export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlist, triggerRef, triggerDetailsRef }: SwipeCardProps) {
   const [dragState, setDragState] = useState({ x: 0, y: 0 });
   const dragRef   = useRef({ x: 0, y: 0 });
+  const panelTouchStartY = useRef(0);
   const startRef  = useRef({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [exiting,  setExiting]  = useState<"left" | "right" | null>(null);
@@ -428,6 +429,12 @@ export default function SwipeCard({ film, isTop, stackIndex, onSwipe, onShortlis
             overflow: "hidden",
           }}
           onMouseDown={e => e.stopPropagation()}
+          onTouchStart={e => { panelTouchStartY.current = e.touches[0].clientY; }}
+          onTouchEnd={e => {
+            const dy = e.changedTouches[0].clientY - panelTouchStartY.current;
+            const el = e.currentTarget.querySelector("[data-scroll]") as HTMLDivElement | null;
+            if (dy > 60 && (el?.scrollTop ?? 0) <= 2) setDetails(false);
+          }}
         >
           {/* Header: drag handle + LESS button */}
           <div style={{

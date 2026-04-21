@@ -292,7 +292,7 @@ export async function GET(request: NextRequest) {
       .select("imdb_id, direction, source")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(10000),
+      .limit(25000),
     supabase.from("watched")
       .select("imdb_id")
       .eq("user_id", user.id),
@@ -431,7 +431,7 @@ export async function GET(request: NextRequest) {
       .from("movies")
       .select(MOVIE_SELECT)
       .order("tmdb_rating", { ascending: false })
-      .limit(hasRuntimeFilter ? 10000 : 8000);
+      .limit(hasRuntimeFilter ? 25000 : 20000);
 
     if (genres.length > 0)                   q = (q as any).overlaps("genres", genres);
     if (filteredSpecial.includes("Classic"))  q = (q as any).lt("year", 1980).gt("year", 0);

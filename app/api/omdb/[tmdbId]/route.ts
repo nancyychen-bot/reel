@@ -150,8 +150,7 @@ export async function GET(
       .from("movies")
       .update({ ...fields, enriched_at: new Date().toISOString() })
       .eq("tmdb_id", parseInt(tmdbId, 10))
-      .then(() => {})
-      .catch(() => {});
+      .then(() => {}, () => {});
   }
 
   // If the caller already knows the IMDb ID, skip the TMDB round-trip entirely.

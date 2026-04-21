@@ -281,8 +281,11 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Swipe history + prefs + watched — order swipes newest-first so recent likes weight more
-  const [{ data: prefs }, { data: swipes }, { data: watchedRows }] = await Promise.all([
+  // Swipe history + prefs + watched — order swipes newest-first so recent likes weight more.
+  // Supabase enforces a server-side max_rows cap (default 1000) that overrides .limit().
+  // We use .range() with pagination: fetch the first page in parallel with prefs/watched,
+  // then fetch additional pages in parallel if we hit the cap.
+  const [{ data: prefs }, { data: swipesPage1 }, { data: watchedRows }] = await Promise.all([
     supabase.from("user_preferences")
       .select("preferred_genres, favorite_film_tmdb_ids")
       .eq("user_id", user.id)
@@ -291,11 +294,22 @@ export async function GET(request: NextRequest) {
       .select("imdb_id, direction, source")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(5000),
+      .range(0, 999),
     supabase.from("watched")
       .select("imdb_id")
       .eq("user_id", user.id),
   ]);
+
+  // If page 1 returned exactly 1000 rows we've hit the cap — fetch more pages in parallel
+  let swipes = swipesPage1 ?? [];
+  if (swipes.length === 1000) {
+    const [p2, p3, p4] = await Promise.all([
+      supabase.from("swipes").select("imdb_id, direction, source").eq("user_id", user.id).order("created_at", { ascending: false }).range(1000, 1999),
+      supabase.from("swipes").select("imdb_id, direction, source").eq("user_id", user.id).order("created_at", { ascending: false }).range(2000, 2999),
+      supabase.from("swipes").select("imdb_id, direction, source").eq("user_id", user.id).order("created_at", { ascending: false }).range(3000, 3999),
+    ]);
+    swipes = [...swipes, ...(p2.data ?? []), ...(p3.data ?? []), ...(p4.data ?? [])];
+  }
 
   // Room passes are temporary — don't permanently exclude them from the regular deck.
   // Room likes still count as seen (user already liked it).

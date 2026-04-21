@@ -81,62 +81,100 @@ const GENRE_MAP: Record<number, string> = {
 // ── Discovery tiers ──────────────────────────────────────────────────────
 // Each tier targets a different slice of acclaimed cinema.
 const TIERS = [
-  // True classics: very high rating + huge vote base
-  { label: "Classics (8.0+, 100k votes)",      pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=100000&vote_average.gte=8.0" },
-  // Acclaimed: high rating + solid vote base
-  { label: "Acclaimed (7.8+, 50k votes)",       pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=50000&vote_average.gte=7.8" },
-  // Quality: good rating + reasonable votes
-  { label: "Quality (7.5+, 10k votes)",         pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=10000&vote_average.gte=7.5" },
-  // Solid (7.2+, 5k votes) — deeper long tail
-  { label: "Solid (7.2+, 5k votes)",            pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=5000&vote_average.gte=7.2" },
-  // Recent (last 5 years)
-  { label: "Recent (2020+)",                    pages: 10, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&primary_release_date.gte=2020-01-01" },
-  // Pre-1980 classics (lower vote counts but still great)
-  { label: "Pre-1980 classics",                  pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.5&primary_release_date.lte=1980-12-31" },
-  // Japanese cinema
-  { label: "Japanese cinema",                    pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.2&with_original_language=ja" },
-  // French cinema
-  { label: "French cinema",                      pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.2&with_original_language=fr" },
-  // Italian cinema
-  { label: "Italian cinema",                     pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=it" },
-  // Korean cinema
-  { label: "Korean cinema",                      pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.2&with_original_language=ko" },
-  // German / Austrian cinema
-  { label: "German cinema",                      pages: 5,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=de" },
-  // Russian / Soviet cinema
-  { label: "Russian/Soviet cinema",              pages: 5,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=ru" },
-  // Spanish-language cinema
-  { label: "Spanish-language cinema",            pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.2&with_original_language=es" },
-  // Chinese / Mandarin cinema
-  { label: "Chinese cinema",                     pages: 5,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=zh" },
-  // Hindi / Bollywood
-  { label: "Hindi cinema",                       pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.2&with_original_language=hi" },
-  // Portuguese / Brazilian cinema
-  { label: "Portuguese cinema",                  pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=pt" },
-  // Scandinavian cinema (Swedish + Danish + Norwegian)
-  { label: "Swedish cinema",                     pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=sv" },
-  { label: "Danish cinema",                      pages: 3,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=da" },
-  { label: "Norwegian cinema",                   pages: 3,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=nb" },
-  // Iranian cinema
-  { label: "Iranian cinema",                     pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=fa" },
-  // Turkish cinema
-  { label: "Turkish cinema",                     pages: 3,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.2&with_original_language=tr" },
-  // Polish cinema
-  { label: "Polish cinema",                      pages: 3,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_original_language=pl" },
-  // Documentary
-  { label: "Documentaries",                      pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.2&with_genres=99" },
-  // Animation
-  { label: "Animation",                          pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.2&with_genres=16" },
-  // Horror
-  { label: "Horror",                             pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.2&with_genres=27" },
-  // Science Fiction
-  { label: "Sci-Fi",                             pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.2&with_genres=878" },
-  // Thriller
-  { label: "Thriller",                           pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.2&with_genres=53" },
-  // Romance
-  { label: "Romance",                            pages: 5,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.2&with_genres=10749" },
-  // Popular by revenue (blockbusters people want to watch together)
-  { label: "Popular blockbusters",               pages: 8,  params: "sort_by=revenue.desc&vote_count.gte=5000&vote_average.gte=6.5" },
+  // ── English-language quality bands ──────────────────────────────────────
+  { label: "Classics (8.0+, 100k votes)",        pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=100000&vote_average.gte=8.0" },
+  { label: "Acclaimed (7.8+, 50k votes)",         pages: 20, params: "sort_by=vote_average.desc&vote_count.gte=50000&vote_average.gte=7.8" },
+  { label: "Quality (7.5+, 10k votes)",           pages: 25, params: "sort_by=vote_average.desc&vote_count.gte=10000&vote_average.gte=7.5" },
+  { label: "Solid (7.2+, 5k votes)",              pages: 20, params: "sort_by=vote_average.desc&vote_count.gte=5000&vote_average.gte=7.2" },
+  { label: "Deep cut (7.0+, 2k votes)",           pages: 20, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0" },
+  { label: "Cult (7.5+, 500 votes)",              pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_count.lte=5000&vote_average.gte=7.5" },
+
+  // ── Popular / mainstream ─────────────────────────────────────────────────
+  { label: "Popular blockbusters",                pages: 15, params: "sort_by=revenue.desc&vote_count.gte=5000&vote_average.gte=6.5" },
+  { label: "Popular by vote count",               pages: 15, params: "sort_by=vote_count.desc&vote_average.gte=7.0" },
+  { label: "Popular recent (2015+)",              pages: 12, params: "sort_by=popularity.desc&vote_count.gte=5000&vote_average.gte=6.8&primary_release_date.gte=2015-01-01" },
+
+  // ── Decade-specific ──────────────────────────────────────────────────────
+  { label: "Pre-1950 classics",                   pages: 10, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&primary_release_date.lte=1949-12-31" },
+  { label: "1950s cinema",                        pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&primary_release_date.gte=1950-01-01&primary_release_date.lte=1959-12-31" },
+  { label: "1960s cinema",                        pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&primary_release_date.gte=1960-01-01&primary_release_date.lte=1969-12-31" },
+  { label: "1970s cinema",                        pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&primary_release_date.gte=1970-01-01&primary_release_date.lte=1979-12-31" },
+  { label: "1980s cinema",                        pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&primary_release_date.gte=1980-01-01&primary_release_date.lte=1989-12-31" },
+  { label: "1990s cinema",                        pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&primary_release_date.gte=1990-01-01&primary_release_date.lte=1999-12-31" },
+  { label: "2000s cinema",                        pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&primary_release_date.gte=2000-01-01&primary_release_date.lte=2009-12-31" },
+  { label: "2010s cinema",                        pages: 20, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&primary_release_date.gte=2010-01-01&primary_release_date.lte=2019-12-31" },
+  { label: "Recent (2020+)",                      pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=6.8&primary_release_date.gte=2020-01-01" },
+  { label: "Recent popular (2020+)",              pages: 10, params: "sort_by=popularity.desc&vote_count.gte=3000&vote_average.gte=6.5&primary_release_date.gte=2020-01-01" },
+
+  // ── East Asian cinema ────────────────────────────────────────────────────
+  { label: "Japanese cinema",                     pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_original_language=ja" },
+  { label: "Japanese popular",                    pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=2000&vote_average.gte=6.5&with_original_language=ja" },
+  { label: "Korean cinema",                       pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_original_language=ko" },
+  { label: "Korean popular",                      pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=2000&vote_average.gte=6.5&with_original_language=ko" },
+  { label: "Chinese cinema",                      pages: 10, params: "sort_by=vote_average.desc&vote_count.gte=300&vote_average.gte=7.0&with_original_language=zh" },
+  { label: "Chinese popular",                     pages: 6,  params: "sort_by=popularity.desc&vote_count.gte=1000&vote_average.gte=6.5&with_original_language=zh" },
+
+  // ── European cinema ──────────────────────────────────────────────────────
+  { label: "French cinema",                       pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_original_language=fr" },
+  { label: "French popular",                      pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=1000&vote_average.gte=6.5&with_original_language=fr" },
+  { label: "Italian cinema",                      pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=300&vote_average.gte=7.0&with_original_language=it" },
+  { label: "German cinema",                       pages: 10, params: "sort_by=vote_average.desc&vote_count.gte=300&vote_average.gte=7.0&with_original_language=de" },
+  { label: "Spanish-language cinema",             pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_original_language=es" },
+  { label: "Spanish popular",                     pages: 6,  params: "sort_by=popularity.desc&vote_count.gte=1000&vote_average.gte=6.5&with_original_language=es" },
+  { label: "Russian/Soviet cinema",               pages: 10, params: "sort_by=vote_average.desc&vote_count.gte=300&vote_average.gte=7.0&with_original_language=ru" },
+  { label: "Swedish cinema",                      pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=sv" },
+  { label: "Danish cinema",                       pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=da" },
+  { label: "Norwegian cinema",                    pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=nb" },
+  { label: "Finnish cinema",                      pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=fi" },
+  { label: "Polish cinema",                       pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=pl" },
+  { label: "Czech cinema",                        pages: 5,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=cs" },
+  { label: "Hungarian cinema",                    pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=hu" },
+  { label: "Romanian cinema",                     pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=ro" },
+  { label: "Greek cinema",                        pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=el" },
+  { label: "Dutch cinema",                        pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=nl" },
+
+  // ── South & West Asian cinema ────────────────────────────────────────────
+  { label: "Hindi cinema",                        pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_original_language=hi" },
+  { label: "Hindi popular",                       pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=2000&vote_average.gte=6.5&with_original_language=hi" },
+  { label: "Iranian cinema",                      pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=fa" },
+  { label: "Turkish cinema",                      pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_original_language=tr" },
+  { label: "Arabic cinema",                       pages: 5,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=ar" },
+
+  // ── Other world cinema ───────────────────────────────────────────────────
+  { label: "Portuguese cinema",                   pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=pt" },
+  { label: "Portuguese popular",                  pages: 5,  params: "sort_by=popularity.desc&vote_count.gte=1000&vote_average.gte=6.5&with_original_language=pt" },
+  { label: "Tamil cinema",                        pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_original_language=ta" },
+  { label: "Telugu cinema",                       pages: 5,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_original_language=te" },
+  { label: "Filipino cinema",                     pages: 4,  params: "sort_by=vote_average.desc&vote_count.gte=200&vote_average.gte=7.0&with_original_language=tl" },
+
+  // ── Genre deep-dives ─────────────────────────────────────────────────────
+  { label: "Documentaries",                       pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=300&vote_average.gte=7.0&with_genres=99" },
+  { label: "Documentary popular",                 pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=500&vote_average.gte=6.5&with_genres=99" },
+  { label: "Animation",                           pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=16" },
+  { label: "Animation popular",                   pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=2000&vote_average.gte=6.5&with_genres=16" },
+  { label: "Horror",                              pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=6.8&with_genres=27" },
+  { label: "Horror popular",                      pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=2000&vote_average.gte=6.5&with_genres=27" },
+  { label: "Sci-Fi",                              pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=878" },
+  { label: "Sci-Fi popular",                      pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=3000&vote_average.gte=6.5&with_genres=878" },
+  { label: "Thriller",                            pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=53" },
+  { label: "Thriller popular",                    pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=3000&vote_average.gte=6.5&with_genres=53" },
+  { label: "Crime",                               pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=80" },
+  { label: "Crime popular",                       pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=3000&vote_average.gte=6.5&with_genres=80" },
+  { label: "Drama",                               pages: 15, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.2&with_genres=18" },
+  { label: "Romance",                             pages: 10, params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=10749" },
+  { label: "Romance popular",                     pages: 6,  params: "sort_by=popularity.desc&vote_count.gte=2000&vote_average.gte=6.5&with_genres=10749" },
+  { label: "Comedy",                              pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&with_genres=35" },
+  { label: "Comedy popular",                      pages: 8,  params: "sort_by=popularity.desc&vote_count.gte=3000&vote_average.gte=6.5&with_genres=35" },
+  { label: "Action",                              pages: 12, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&with_genres=28" },
+  { label: "Action popular",                      pages: 10, params: "sort_by=popularity.desc&vote_count.gte=5000&vote_average.gte=6.5&with_genres=28" },
+  { label: "Adventure",                           pages: 10, params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&with_genres=12" },
+  { label: "Western",                             pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_genres=37" },
+  { label: "War",                                 pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=10752" },
+  { label: "Mystery",                             pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=9648" },
+  { label: "Music",                               pages: 6,  params: "sort_by=vote_average.desc&vote_count.gte=500&vote_average.gte=7.0&with_genres=10402" },
+  { label: "History",                             pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=1000&vote_average.gte=7.0&with_genres=36" },
+  { label: "Family",                              pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&with_genres=10751" },
+  { label: "Fantasy",                             pages: 8,  params: "sort_by=vote_average.desc&vote_count.gte=2000&vote_average.gte=7.0&with_genres=14" },
 ];
 
 // ── Fetch a TMDB detail page ──────────────────────────────────────────────

@@ -279,24 +279,28 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
         </div>
       </div>
 
-      {/* Trailer modal */}
+      {/* Trailer modal — fixed fullscreen, rotated to landscape */}
       {trailerOpen && enriched?.trailerKey && (
         <div
           onClick={() => setTrailerOpen(false)}
           style={{
             position: "fixed", inset: 0,
-            zIndex: 300,
-            background: "rgba(0,0,0,0.92)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 12,
+            zIndex: 9999,
+            background: "#000",
+            overflow: "hidden",
           }}
         >
+          {/* Rotated container fills the screen in landscape */}
           <div
             onClick={e => e.stopPropagation()}
-            style={{ width: "100%", aspectRatio: "16/9" }}
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              width: "100vh",
+              height: "100vw",
+              transform: "translate(-50%, -50%) rotate(90deg)",
+            }}
           >
             <iframe
               src={`https://www.youtube.com/embed/${enriched.trailerKey}?autoplay=1&rel=0&modestbranding=1`}
@@ -305,22 +309,27 @@ export default function FilmModal({ film, onClose }: { film: ModalFilm | null; o
               style={{ width: "100%", height: "100%", border: "none" }}
             />
           </div>
+          {/* Close button — top-left corner (appears top-right in landscape) */}
           <button
             onClick={() => setTrailerOpen(false)}
             style={{
-              background: "none",
-              border: "1px solid #333",
+              position: "absolute",
+              top: 16,
+              left: 16,
+              zIndex: 10000,
+              background: "rgba(0,0,0,0.6)",
+              border: "1px solid #444",
               borderRadius: 2,
-              color: "#5A5550",
+              color: "#888",
               fontFamily: "var(--font-mono)",
               fontSize: 9,
               letterSpacing: "0.16em",
               textTransform: "uppercase",
-              padding: "6px 18px",
+              padding: "6px 14px",
               cursor: "pointer",
             }}
           >
-            Close
+            ✕ Close
           </button>
         </div>
       )}

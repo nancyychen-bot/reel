@@ -431,7 +431,7 @@ export async function GET(request: NextRequest) {
       .from("movies")
       .select(MOVIE_SELECT)
       .order("tmdb_rating", { ascending: false })
-      .limit(hasRuntimeFilter ? 3000 : 2000);
+      .limit(hasRuntimeFilter ? 10000 : 8000);
 
     if (genres.length > 0)                   q = (q as any).overlaps("genres", genres);
     if (filteredSpecial.includes("Classic"))  q = (q as any).lt("year", 1980).gt("year", 0);

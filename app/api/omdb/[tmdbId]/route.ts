@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { PROVIDER_IDS } from "@/lib/providers";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const OMDB_KEY = process.env.OMDB_API_KEY;
 const TMDB_KEY = process.env.TMDB_API_KEY;
@@ -100,7 +101,58 @@ export async function GET(
   { params }: { params: Promise<{ tmdbId: string }> }
 ) {
   const { tmdbId } = await params;
+
+  // ── 1. Check DB cache ────────────────────────────────────────────────────
+  const admin = createAdminClient();
+  const { data: cached } = await admin
+    .from("movies")
+    .select("imdb_id, imdb_rating, rt_score, awards_text, trailer_key, language, country, director, runtime_minutes")
+    .eq("tmdb_id", parseInt(tmdbId, 10))
+    .not("enriched_at", "is", null)
+    .maybeSingle();
+
+  if (cached) {
+    const { wins: festivalWins, noms: festivalNoms } = parseFestivalAwards(cached.awards_text ?? "");
+    // Streaming providers are not cached in DB — still fetch live (cheap, separate endpoint)
+    const streamingProviders = await fetchStreamingProviders(tmdbId);
+    return Response.json({
+      imdbId:      cached.imdb_id ?? undefined,
+      imdbRating:  cached.imdb_rating ?? undefined,
+      rtScore:     cached.rt_score ?? undefined,
+      awards:      cached.awards_text ?? undefined,
+      festivalWins: festivalWins.length ? festivalWins : undefined,
+      festivalNoms: festivalNoms.length ? festivalNoms : undefined,
+      director:    cached.director ?? undefined,
+      runtime:     cached.runtime_minutes ?? undefined,
+      language:    cached.language ?? undefined,
+      country:     cached.country ?? undefined,
+      trailerKey:  cached.trailer_key ?? undefined,
+      streamingProviders: streamingProviders.length ? streamingProviders : undefined,
+    });
+  }
+
+  // ── 2. Cache miss — fetch from OMDB/TMDB ────────────────────────────────
   if (!OMDB_KEY) return Response.json({});
+
+  // Helper: write enrichment back to DB (fire-and-forget)
+  function writeEnrichment(fields: {
+    imdb_id?: string;
+    imdb_rating?: number;
+    rt_score?: number;
+    awards_text?: string;
+    trailer_key?: string;
+    language?: string;
+    country?: string;
+    director?: string;
+    runtime_minutes?: number;
+  }) {
+    admin
+      .from("movies")
+      .update({ ...fields, enriched_at: new Date().toISOString() })
+      .eq("tmdb_id", parseInt(tmdbId, 10))
+      .then(() => {})
+      .catch(() => {});
+  }
 
   // If the caller already knows the IMDb ID, skip the TMDB round-trip entirely.
   const imdbIdParam = request.nextUrl.searchParams.get("imdbId");
@@ -118,6 +170,7 @@ export async function GET(
     ]);
 
     if (!omdb || omdb.Response === "False") {
+      writeEnrichment({ imdb_id: knownImdbId, trailer_key: trailerKey });
       return Response.json({ imdbId: knownImdbId, trailerKey, streamingProviders: streamingProviders.length ? streamingProviders : undefined });
     }
 
@@ -127,7 +180,13 @@ export async function GET(
     const imdbRating = omdb.imdbRating && omdb.imdbRating !== "N/A"
       ? parseFloat(omdb.imdbRating) : undefined;
     const awards = omdb.Awards && omdb.Awards !== "N/A" ? omdb.Awards : undefined;
+    const director = omdb.Director !== "N/A" ? omdb.Director : undefined;
+    const runtime  = omdb.Runtime  !== "N/A" ? parseInt(omdb.Runtime) : undefined;
+    const language = omdb.Language !== "N/A" ? omdb.Language : undefined;
+    const country  = omdb.Country  !== "N/A" ? omdb.Country  : undefined;
     const { wins: festivalWins, noms: festivalNoms } = parseFestivalAwards(omdb.Awards ?? "");
+
+    writeEnrichment({ imdb_id: knownImdbId, imdb_rating: imdbRating, rt_score: rtScore, awards_text: awards, trailer_key: trailerKey, language, country, director, runtime_minutes: runtime });
 
     return Response.json({
       imdbId:      knownImdbId,
@@ -136,10 +195,10 @@ export async function GET(
       awards,
       festivalWins: festivalWins.length ? festivalWins : undefined,
       festivalNoms: festivalNoms.length ? festivalNoms : undefined,
-      director:  omdb.Director !== "N/A" ? omdb.Director : undefined,
-      runtime:   omdb.Runtime  !== "N/A" ? parseInt(omdb.Runtime) : undefined,
-      language:  omdb.Language !== "N/A" ? omdb.Language : undefined,
-      country:   omdb.Country  !== "N/A" ? omdb.Country  : undefined,
+      director,
+      runtime,
+      language,
+      country,
       trailerKey,
       streamingProviders: streamingProviders.length ? streamingProviders : undefined,
     });
@@ -167,6 +226,7 @@ export async function GET(
   const country = (tmdbRes?.production_countries as Array<{ name: string }> | undefined)?.[0]?.name;
 
   if (!imdbId) {
+    writeEnrichment({ trailer_key: trailerKey, language, country, director, runtime_minutes: runtime });
     return Response.json({ director, runtime, language, country, trailerKey, streamingProviders: streamingProviders.length ? streamingProviders : undefined });
   }
 
@@ -176,6 +236,7 @@ export async function GET(
   ).then(r => r.json()).catch(() => null);
 
   if (!omdb || omdb.Response === "False") {
+    writeEnrichment({ imdb_id: imdbId, trailer_key: trailerKey, language, country, director, runtime_minutes: runtime });
     return Response.json({ imdbId, director, runtime, language, country, trailerKey });
   }
 
@@ -187,6 +248,13 @@ export async function GET(
   const awards = omdb.Awards && omdb.Awards !== "N/A" ? omdb.Awards : undefined;
   const { wins: festivalWins, noms: festivalNoms } = parseFestivalAwards(omdb.Awards ?? "");
 
+  const finalDirector = director ?? (omdb.Director !== "N/A" ? omdb.Director : undefined);
+  const finalRuntime  = runtime  ?? (omdb.Runtime  !== "N/A" ? parseInt(omdb.Runtime) : undefined);
+  const finalLanguage = language ?? (omdb.Language !== "N/A" ? omdb.Language : undefined);
+  const finalCountry  = country  ?? (omdb.Country  !== "N/A" ? omdb.Country  : undefined);
+
+  writeEnrichment({ imdb_id: imdbId, imdb_rating: imdbRating, rt_score: rtScore, awards_text: awards, trailer_key: trailerKey, language: finalLanguage, country: finalCountry, director: finalDirector, runtime_minutes: finalRuntime });
+
   return Response.json({
     imdbId,
     imdbRating,
@@ -194,10 +262,10 @@ export async function GET(
     awards,
     festivalWins: festivalWins.length ? festivalWins : undefined,
     festivalNoms: festivalNoms.length ? festivalNoms : undefined,
-    director:  director ?? (omdb.Director !== "N/A" ? omdb.Director : undefined),
-    runtime:   runtime  ?? (omdb.Runtime  !== "N/A" ? parseInt(omdb.Runtime) : undefined),
-    language:  language ?? (omdb.Language !== "N/A" ? omdb.Language : undefined),
-    country:   country  ?? (omdb.Country  !== "N/A" ? omdb.Country  : undefined),
+    director:  finalDirector,
+    runtime:   finalRuntime,
+    language:  finalLanguage,
+    country:   finalCountry,
     trailerKey,
     streamingProviders: streamingProviders.length ? streamingProviders : undefined,
   });
